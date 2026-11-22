@@ -82,7 +82,12 @@ func NewHandler(
 	api.Handle("/settings", monkey(settingsGetHandler, "")).Methods("GET")
 	api.Handle("/settings", monkey(settingsPutHandler, "")).Methods("PUT")
 
-	api.PathPrefix("/raw").Handler(monkey(rawHandler, "/api/raw")).Methods("GET")
+	api.PathPrefix("/raw").Handler(monkey(rawHandler, "/api/raw")).Methods("GET", "HEAD")
+	api.PathPrefix("/mediainfo").Handler(monkey(mediaInfoHandler, "/api/mediainfo")).Methods("GET")
+	api.Handle("/bdinfo/scan", monkey(bdInfoScanHandler, "")).Methods("POST")
+	api.Handle("/bdinfo/tasks/{id}", monkey(bdInfoTaskHandler, "")).Methods("GET")
+	api.Handle("/fastdl/sign", monkey(fastDLSignHandler, "")).Methods("POST")
+	api.Handle("/fastdl/{token}/{filename:.*}", monkey(fastDLServeHandler, "")).Methods("GET", "HEAD")
 	api.PathPrefix("/preview/{size}/{path:.*}").
 		Handler(monkey(previewHandler(imgSvc, fileCache, server.EnableThumbnails, server.ResizePreview), "/api/preview")).Methods("GET")
 	api.PathPrefix("/command").Handler(monkey(commandsHandler, "/api/command")).Methods("GET")

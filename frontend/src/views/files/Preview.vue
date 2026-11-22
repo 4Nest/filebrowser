@@ -58,6 +58,12 @@
         />
         <action
           :disabled="layoutStore.loading"
+          icon="analytics"
+          label="MediaInfo"
+          show="mediainfo"
+        />
+        <action
+          :disabled="layoutStore.loading"
           icon="info"
           :label="$t('buttons.info')"
           show="info"

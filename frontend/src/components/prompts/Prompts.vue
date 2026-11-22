@@ -29,6 +29,8 @@ import Upload from "./Upload.vue";
 import DiscardEditorChanges from "./DiscardEditorChanges.vue";
 import ResolveConflict from "./ResolveConflict.vue";
 import CurrentPassword from "./CurrentPassword.vue";
+import MediaInfo from "./MediaInfo.vue";
+import BDInfo from "./BDInfo.vue";
 
 const layoutStore = useLayoutStore();
 
@@ -52,6 +54,8 @@ const components = new Map<string, any>([
   ["discardEditorChanges", DiscardEditorChanges],
   ["resolve-conflict", ResolveConflict],
   ["current-password", CurrentPassword],
+  ["mediainfo", MediaInfo],
+  ["bdinfo", BDInfo],
 ]);
 
 const modal = computed(() => {

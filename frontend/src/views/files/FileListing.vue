@@ -48,10 +48,27 @@
         </template>
 
         <action
+          v-if="headerButtons.mediainfo"
+          icon="analytics"
+          label="MediaInfo"
+          show="mediainfo"
+        />
+        <action
+          v-if="headerButtons.bdinfo"
+          icon="album"
+          label="BDInfo"
+          show="bdinfo"
+        />
+        <action
           v-if="headerButtons.shell"
           icon="code"
           :label="t('buttons.shell')"
           @action="layoutStore.toggleShell"
+        />
+        <action
+          :icon="isDark ? 'light_mode' : 'dark_mode'"
+          :label="isDark ? '浅色模式' : '暗黑模式'"
+          @action="toggleTheme"
         />
         <action
           :icon="viewIcon"
@@ -296,6 +313,18 @@
             show="delete"
           />
           <action
+            v-if="headerButtons.mediainfo"
+            icon="analytics"
+            label="MediaInfo"
+            show="mediainfo"
+          />
+          <action
+            v-if="headerButtons.bdinfo"
+            icon="album"
+            label="BDInfo"
+            show="bdinfo"
+          />
+          <action
             v-if="headerButtons.download"
             icon="file_download"
             :label="t('buttons.download')"
@@ -348,6 +377,7 @@ import { useLayoutStore } from "@/stores/layout";
 import { users, files as api } from "@/api";
 import { enableExec } from "@/utils/constants";
 import * as upload from "@/utils/upload";
+import { getTheme, getMediaPreference, setTheme } from "@/utils/theme";
 import buttons from "@/utils/buttons";
 import css from "@/utils/css";
 import { throttle } from "lodash-es";
@@ -474,11 +504,30 @@ const viewIcon = computed(() => {
     : icons[authStore.user.viewMode];
 });
 
+const isDark = ref((getTheme() || getMediaPreference()) === "dark");
+const toggleTheme = () => {
+  const next = isDark.value ? "light" : "dark";
+  setTheme(next);
+  isDark.value = next === "dark";
+};
+
+const selectedSingleItem = computed(() => {
+  if (fileStore.selectedCount !== 1 || !fileStore.req) return null;
+  return fileStore.req.items[fileStore.selected[0]] ?? null;
+});
+
 const headerButtons = computed(() => {
+  const single = selectedSingleItem.value;
+  const isMediaFile = !!single && !single.isDir;
+  const isBDTarget =
+    (!!single && (single.isDir || single.name.toLowerCase().endsWith(".iso"))) ||
+    fileStore.selectedCount === 0;
   return {
     upload: authStore.user?.perm.create,
     download: authStore.user?.perm.download,
     shell: authStore.user?.perm.execute && enableExec,
+    mediainfo: isMediaFile,
+    bdinfo: isBDTarget,
     delete: fileStore.selectedCount > 0 && authStore.user?.perm.delete,
     rename: fileStore.selectedCount === 1 && authStore.user?.perm.rename,
     share:
@@ -987,30 +1036,23 @@ const windowsResize = throttle(() => {
 const download = () => {
   if (fileStore.req === null) return;
 
-  if (
-    fileStore.selectedCount === 1 &&
-    !fileStore.req.items[fileStore.selected[0]].isDir
-  ) {
-    api.download(null, fileStore.req.items[fileStore.selected[0]].url);
-    return;
+  const targetFiles: string[] = [];
+  if (fileStore.selectedCount > 0) {
+    for (const i of fileStore.selected) {
+      targetFiles.push(fileStore.req.items[i].url);
+    }
+  } else {
+    targetFiles.push(route.path);
   }
 
   layoutStore.showHover({
     prompt: "download",
+    props: {
+      urls: targetFiles,
+    },
     confirm: (format: any) => {
       layoutStore.closeHovers();
-
-      const files = [];
-
-      if (fileStore.selectedCount > 0 && fileStore.req !== null) {
-        for (const i of fileStore.selected) {
-          files.push(fileStore.req.items[i].url);
-        }
-      } else {
-        files.push(route.path);
-      }
-
-      api.download(format, ...files);
+      api.download(format, ...targetFiles);
     },
   });
 };

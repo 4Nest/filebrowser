@@ -174,6 +174,40 @@ func rawDirHandler(w http.ResponseWriter, r *http.Request, d *data, file *files.
 		return http.StatusInternalServerError, err
 	}
 
+	algo := r.URL.Query().Get("algo")
+	if algo == "vtar" || algo == "tar" {
+		commonDir := fileutils.CommonPrefix(filepath.Separator, filenames...)
+		vt, err := NewVirtualTar(d, filenames, commonDir)
+		if err != nil {
+			return http.StatusInternalServerError, err
+		}
+		defer vt.Close()
+
+		name := filepath.Base(commonDir)
+		if name == "." || name == "" || name == string(filepath.Separator) {
+			if file.Name != "" {
+				name = file.Name
+			} else {
+				actual, statErr := file.Fs.Stat(".")
+				if statErr != nil {
+					return http.StatusInternalServerError, statErr
+				}
+				name = actual.Name()
+			}
+		}
+		if len(filenames) > 1 {
+			name = "_" + name
+		}
+		name += ".tar"
+		w.Header().Set("Content-Disposition", "attachment; filename*=utf-8''"+url.PathEscape(name))
+		w.Header().Set("Content-Type", "application/x-tar")
+		w.Header().Set("ETag", vt.ETag())
+		w.Header().Set("Cache-Control", "private")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		http.ServeContent(w, r, name, vt.ModTime(), vt)
+		return 0, nil
+	}
+
 	extension, archiver, err := parseQueryAlgorithm(r)
 	if err != nil {
 		return http.StatusInternalServerError, err
