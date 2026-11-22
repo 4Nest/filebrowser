@@ -86,6 +86,7 @@ func NewHandler(
 	api.PathPrefix("/mediainfo").Handler(monkey(mediaInfoHandler, "/api/mediainfo")).Methods("GET")
 	api.Handle("/bdinfo/scan", monkey(bdInfoScanHandler, "")).Methods("POST")
 	api.Handle("/bdinfo/tasks/{id}", monkey(bdInfoTaskHandler, "")).Methods("GET")
+	api.Handle("/bdinfo/tasks/{id}", monkey(bdInfoCancelHandler, "")).Methods("DELETE")
 	api.Handle("/fastdl/sign", monkey(fastDLSignHandler, "")).Methods("POST")
 	api.Handle("/fastdl/{token}/{filename:.*}", monkey(fastDLServeHandler, "")).Methods("GET", "HEAD")
 	api.PathPrefix("/preview/{size}/{path:.*}").

@@ -25,15 +25,15 @@ import (
 )
 
 type mediaInfoSummary struct {
-	Format      string   `json:"format,omitempty"`
-	FileSize    string   `json:"fileSize,omitempty"`
-	Duration    string   `json:"duration,omitempty"`
-	BitRate     string   `json:"bitRate,omitempty"`
-	Video       []string `json:"video,omitempty"`
-	Audio       []string `json:"audio,omitempty"`
-	Subtitles   int      `json:"subtitles"`
-	HasHDR      bool     `json:"hasHdr"`
-	HDRLabel    string   `json:"hdrLabel,omitempty"`
+	Format    string   `json:"format,omitempty"`
+	FileSize  string   `json:"fileSize,omitempty"`
+	Duration  string   `json:"duration,omitempty"`
+	BitRate   string   `json:"bitRate,omitempty"`
+	Video     []string `json:"video,omitempty"`
+	Audio     []string `json:"audio,omitempty"`
+	Subtitles int      `json:"subtitles"`
+	HasHDR    bool     `json:"hasHdr"`
+	HDRLabel  string   `json:"hdrLabel,omitempty"`
 }
 
 type mediaInfoResponse struct {
@@ -246,7 +246,6 @@ var mediaInfoHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *
 	}
 
 	raw := stdout.String()
-	// Strip server absolute path prefix so Complete name shows only filename.
 	cleaned := sanitizeMediaInfoPath(raw, fullPath, st.Name())
 
 	return renderJSON(w, r, mediaInfoResponse{
@@ -270,20 +269,33 @@ func sanitizeMediaInfoPath(report, fullPath, baseName string) string {
 
 // --- BDInfo Async Task Manager ---
 
+type bdInfoSummary struct {
+	DiscTitle     string `json:"discTitle,omitempty"`
+	DiscSize      string `json:"discSize,omitempty"`
+	Playlist      string `json:"playlist,omitempty"`
+	Length        string `json:"length,omitempty"`
+	BitRate       string `json:"bitRate,omitempty"`
+	Video         string `json:"video,omitempty"`
+	AudioCount    int    `json:"audioCount"`
+	SubtitleCount int    `json:"subtitleCount"`
+}
+
 type bdInfoTask struct {
-	ID           string    `json:"id"`
-	UserID       uint      `json:"-"`
-	Path         string    `json:"path"`
-	TargetPath   string    `json:"targetPath"`
-	Status       string    `json:"status"` // "running", "done", "error"
-	Progress     int       `json:"progress"`
-	Stage        string    `json:"stage"`
-	QuickSummary string    `json:"quickSummary,omitempty"`
-	FullReport   string    `json:"fullReport,omitempty"`
-	Error        string    `json:"error,omitempty"`
-	StartedAt    time.Time `json:"startedAt"`
-	FinishedAt   time.Time `json:"finishedAt,omitempty"`
-	ElapsedSec   float64   `json:"elapsedSec"`
+	ID           string             `json:"id"`
+	UserID       uint               `json:"-"`
+	cancel       context.CancelFunc `json:"-"`
+	Path         string             `json:"path"`
+	TargetPath   string             `json:"targetPath"`
+	Status       string             `json:"status"` // "running", "done", "error", "canceled"
+	Progress     int                `json:"progress"`
+	Stage        string             `json:"stage"`
+	Summary      bdInfoSummary      `json:"summary"`
+	QuickSummary string             `json:"quickSummary,omitempty"`
+	FullReport   string             `json:"fullReport,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	StartedAt    time.Time          `json:"startedAt"`
+	FinishedAt   time.Time          `json:"finishedAt,omitempty"`
+	ElapsedSec   float64            `json:"elapsedSec"`
 }
 
 type bdInfoScanRequest struct {
@@ -292,9 +304,9 @@ type bdInfoScanRequest struct {
 }
 
 type bdInfoManager struct {
-	mu      sync.RWMutex
-	tasks   map[string]*bdInfoTask
-	byPath  map[string]string // fullPath -> latest taskID
+	mu     sync.RWMutex
+	tasks  map[string]*bdInfoTask
+	byPath map[string]string
 }
 
 var globalBDInfo = &bdInfoManager{
@@ -317,48 +329,95 @@ func detectBDMVRoot(fullPath string) (string, error) {
 		if strings.EqualFold(filepath.Ext(fullPath), ".iso") {
 			return fullPath, nil
 		}
-		return "", errors.New("BDInfo requires a BDMV folder, Blu-ray root directory, or .iso file")
+		return "", errors.New("BDInfo 仅支持 BDMV 目录、蓝光原盘根目录或 .iso 镜像文件")
 	}
 
-	// Case 1: Selected directory itself contains BDMV/index.bdmv
 	if _, err := os.Stat(filepath.Join(fullPath, "BDMV", "index.bdmv")); err == nil {
 		return fullPath, nil
 	}
-	// Case 2: Selected directory IS the BDMV folder itself
 	if strings.EqualFold(filepath.Base(fullPath), "BDMV") {
 		if _, err := os.Stat(filepath.Join(fullPath, "index.bdmv")); err == nil {
 			return filepath.Dir(fullPath), nil
 		}
 	}
-	// Case 3: Selected directory has a single child folder containing BDMV/index.bdmv
+	// Search up to 2 levels deep for a BDMV/index.bdmv folder
 	entries, err := os.ReadDir(fullPath)
 	if err == nil {
 		for _, e := range entries {
-			if e.IsDir() {
-				candidate := filepath.Join(fullPath, e.Name())
-				if _, err := os.Stat(filepath.Join(candidate, "BDMV", "index.bdmv")); err == nil {
-					return candidate, nil
+			if !e.IsDir() {
+				continue
+			}
+			c1 := filepath.Join(fullPath, e.Name())
+			if _, err := os.Stat(filepath.Join(c1, "BDMV", "index.bdmv")); err == nil {
+				return c1, nil
+			}
+			sub, err2 := os.ReadDir(c1)
+			if err2 == nil {
+				for _, se := range sub {
+					if !se.IsDir() {
+						continue
+					}
+					c2 := filepath.Join(c1, se.Name())
+					if _, err := os.Stat(filepath.Join(c2, "BDMV", "index.bdmv")); err == nil {
+						return c2, nil
+					}
 				}
 			}
 		}
 	}
-	return "", errors.New("no BDMV/index.bdmv structure found in selected directory")
+	return "", errors.New("当前目录及其子目录中未检测到 BDMV/index.bdmv 原盘结构")
 }
 
 func extractBDInfoQuickSummary(fullReport string) string {
 	idx := strings.Index(fullReport, "QUICK SUMMARY:")
-	if idx < 0 {
-		return strings.TrimSpace(fullReport)
+	if idx >= 0 {
+		rest := fullReport[idx:]
+		for _, stop := range []string{"\nFILES:", "\nCHAPTERS:", "\nSTREAM DIAGNOSTICS:", "\n\n\n"} {
+			if sIdx := strings.Index(rest, stop); sIdx > 0 {
+				rest = rest[:sIdx]
+				break
+			}
+		}
+		return strings.TrimSpace(rest)
 	}
-	rest := fullReport[idx:]
-	// Quick summary usually ends before "FILES:" or "CHAPTERS:" or "STREAM DIAGNOSTICS:"
-	for _, stop := range []string{"\nFILES:", "\nCHAPTERS:", "\nSTREAM DIAGNOSTICS:", "\n\n\n"} {
-		if sIdx := strings.Index(rest, stop); sIdx > 0 {
-			rest = rest[:sIdx]
+	// Fallback: cut before FILES: / STREAM DIAGNOSTICS:
+	out := fullReport
+	for _, stop := range []string{"\nFILES:", "\nSTREAM DIAGNOSTICS:"} {
+		if sIdx := strings.Index(out, stop); sIdx > 0 {
+			out = out[:sIdx]
 			break
 		}
 	}
-	return strings.TrimSpace(rest)
+	return strings.TrimSpace(out)
+}
+
+func parseBDInfoSummary(report string) bdInfoSummary {
+	var s bdInfoSummary
+	scanner := bufio.NewScanner(strings.NewReader(report))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		switch {
+		case strings.HasPrefix(line, "Disc Title:") && s.DiscTitle == "":
+			s.DiscTitle = strings.TrimSpace(strings.TrimPrefix(line, "Disc Title:"))
+		case strings.HasPrefix(line, "Disc Size:") && s.DiscSize == "":
+			s.DiscSize = strings.TrimSpace(strings.TrimPrefix(line, "Disc Size:"))
+		case strings.HasPrefix(line, "Name:") && s.Playlist == "":
+			s.Playlist = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+		case strings.HasPrefix(line, "PLAYLIST:") && s.Playlist == "":
+			s.Playlist = strings.TrimSpace(strings.TrimPrefix(line, "PLAYLIST:"))
+		case strings.HasPrefix(line, "Length:") && s.Length == "":
+			s.Length = strings.TrimSpace(strings.TrimPrefix(line, "Length:"))
+		case strings.HasPrefix(line, "Total Bitrate:") && s.BitRate == "":
+			s.BitRate = strings.TrimSpace(strings.TrimPrefix(line, "Total Bitrate:"))
+		case strings.HasPrefix(line, "Video:") && s.Video == "":
+			s.Video = strings.TrimSpace(strings.TrimPrefix(line, "Video:"))
+		case strings.HasPrefix(line, "Audio:"):
+			s.AudioCount++
+		case strings.HasPrefix(line, "Subtitle:"):
+			s.SubtitleCount++
+		}
+	}
+	return s
 }
 
 var pctRegex = regexp.MustCompile(`(\d{1,3})%`)
@@ -375,12 +434,12 @@ func (m *bdInfoManager) startScan(userID uint, reqPath, fullPath string, force b
 	}
 
 	m.mu.Lock()
-	// Reuse running task or recent cached completed task (30 min).
 	if !force {
 		if oldID, ok := m.byPath[targetPath]; ok {
 			if old, exists := m.tasks[oldID]; exists && old.UserID == userID {
 				if old.Status == "running" || (old.Status == "done" && time.Since(old.FinishedAt) < 30*time.Minute) {
 					cp := *old
+					cp.cancel = nil
 					cp.ElapsedSec = time.Since(old.StartedAt).Seconds()
 					if old.Status == "done" {
 						cp.ElapsedSec = old.FinishedAt.Sub(old.StartedAt).Seconds()
@@ -392,27 +451,30 @@ func (m *bdInfoManager) startScan(userID uint, reqPath, fullPath string, force b
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	task := &bdInfoTask{
 		ID:         newTaskID(),
 		UserID:     userID,
+		cancel:     cancel,
 		Path:       reqPath,
 		TargetPath: filepath.Base(targetPath),
 		Status:     "running",
 		Progress:   5,
-		Stage:      "Starting BDInfo scanner...",
+		Stage:      "正在启动 BDInfo 扫描器并解析 MPLS 播放列表…",
 		StartedAt:  time.Now(),
 	}
 	m.tasks[task.ID] = task
 	m.byPath[targetPath] = task.ID
 	m.mu.Unlock()
 
-	go m.runTask(task.ID, bin, targetPath)
+	go m.runTask(ctx, task.ID, bin, targetPath)
 
 	cp := *task
+	cp.cancel = nil
 	return &cp, nil
 }
 
-func (m *bdInfoManager) runTask(taskID, bin, targetPath string) {
+func (m *bdInfoManager) runTask(ctx context.Context, taskID, bin, targetPath string) {
 	tmpDir, err := os.MkdirTemp("", "fb-bdinfo-*")
 	if err != nil {
 		m.failTask(taskID, fmt.Sprintf("failed to create temp dir: %v", err))
@@ -420,11 +482,6 @@ func (m *bdInfoManager) runTask(taskID, bin, targetPath string) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
-	defer cancel()
-
-	// BDInfoCLI / wrapper convention: `bdinfo <targetPath> <outputDir>`
-	// Support passing custom extra args via FB_BDINFO_ARGS if desired.
 	args := []string{targetPath, tmpDir}
 	if extra := strings.TrimSpace(os.Getenv("FB_BDINFO_ARGS")); extra != "" {
 		args = append(strings.Fields(extra), args...)
@@ -455,16 +512,23 @@ func (m *bdInfoManager) runTask(taskID, bin, targetPath string) {
 			}
 		}
 		if readErr != nil {
-			if readErr != io.EOF {
-				break
-			}
 			break
 		}
 	}
 
 	runErr := cmd.Wait()
+	if ctx.Err() == context.Canceled {
+		m.mu.Lock()
+		if t, ok := m.tasks[taskID]; ok {
+			t.Status = "canceled"
+			t.Stage = "已取消扫描"
+			t.FinishedAt = time.Now()
+			t.ElapsedSec = t.FinishedAt.Sub(t.StartedAt).Seconds()
+		}
+		m.mu.Unlock()
+		return
+	}
 
-	// Look for generated report file in tmpDir (BDINFO.*.txt or *.txt).
 	var reportText string
 	entries, _ := os.ReadDir(tmpDir)
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
@@ -477,7 +541,6 @@ func (m *bdInfoManager) runTask(taskID, bin, targetPath string) {
 		}
 	}
 	if strings.TrimSpace(reportText) == "" {
-		// Some bdinfo wrappers print the report directly to stdout.
 		if strings.Contains(outBuf.String(), "DISC INFO:") || strings.Contains(outBuf.String(), "PLAYLIST REPORT:") {
 			reportText = outBuf.String()
 		}
@@ -497,12 +560,14 @@ func (m *bdInfoManager) runTask(taskID, bin, targetPath string) {
 	}
 
 	quick := extractBDInfoQuickSummary(reportText)
+	summary := parseBDInfoSummary(reportText)
 
 	m.mu.Lock()
 	if t, ok := m.tasks[taskID]; ok {
 		t.Status = "done"
 		t.Progress = 100
-		t.Stage = "Completed"
+		t.Stage = "扫描完成"
+		t.Summary = summary
 		t.FullReport = strings.TrimSpace(reportText)
 		t.QuickSummary = quick
 		t.FinishedAt = time.Now()
@@ -528,8 +593,8 @@ func (m *bdInfoManager) updateProgress(taskID, line string) {
 				t.Progress = pct
 			}
 		}
-	} else if t.Progress < 90 {
-		t.Progress++
+	} else if t.Progress < 92 {
+		t.Progress += 2
 	}
 }
 
@@ -539,10 +604,23 @@ func (m *bdInfoManager) failTask(taskID, msg string) {
 	if t, ok := m.tasks[taskID]; ok {
 		t.Status = "error"
 		t.Error = msg
-		t.Stage = "Failed"
+		t.Stage = "扫描失败"
 		t.FinishedAt = time.Now()
 		t.ElapsedSec = t.FinishedAt.Sub(t.StartedAt).Seconds()
 	}
+}
+
+func (m *bdInfoManager) cancelTask(taskID string, userID uint) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	t, ok := m.tasks[taskID]
+	if !ok || t.UserID != userID {
+		return false
+	}
+	if t.cancel != nil && t.Status == "running" {
+		t.cancel()
+	}
+	return true
 }
 
 func (m *bdInfoManager) getTask(taskID string, userID uint) (*bdInfoTask, bool) {
@@ -553,6 +631,7 @@ func (m *bdInfoManager) getTask(taskID string, userID uint) (*bdInfoTask, bool) 
 		return nil, false
 	}
 	cp := *t
+	cp.cancel = nil
 	if cp.Status == "running" {
 		cp.ElapsedSec = time.Since(cp.StartedAt).Seconds()
 	}
@@ -584,4 +663,12 @@ var bdInfoTaskHandler = withUser(func(w http.ResponseWriter, r *http.Request, d 
 		return http.StatusNotFound, nil
 	}
 	return renderJSON(w, r, task)
+})
+
+var bdInfoCancelHandler = withUser(func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
+	id := mux.Vars(r)["id"]
+	if !globalBDInfo.cancelTask(id, d.user.ID) {
+		return http.StatusNotFound, nil
+	}
+	return http.StatusNoContent, nil
 })

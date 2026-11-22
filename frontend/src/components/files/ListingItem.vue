@@ -40,6 +40,41 @@
       <p class="modified">
         <time :datetime="modified">{{ humanTime() }}</time>
       </p>
+
+      <div
+        v-if="!readOnly"
+        class="fb-row-quick-actions"
+        @click.stop
+        @dblclick.stop
+      >
+        <button
+          v-if="!isDir"
+          type="button"
+          class="fb-quick-btn"
+          title="MediaInfo"
+          @click.stop="openMediaInfo"
+        >
+          <i class="material-icons">analytics</i>
+        </button>
+        <button
+          v-if="isDir || name.toLowerCase().endsWith('.iso')"
+          type="button"
+          class="fb-quick-btn"
+          title="BDInfo 扫描"
+          @click.stop="openBDInfo"
+        >
+          <i class="material-icons">album</i>
+        </button>
+        <button
+          v-if="authStore.user?.perm.download"
+          type="button"
+          class="fb-quick-btn"
+          title="高速下载"
+          @click.stop="openFastDownload"
+        >
+          <i class="material-icons">bolt</i>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -118,6 +153,31 @@ const thumbnailUrl = computed(() => {
 const isThumbsEnabled = computed(() => {
   return enableThumbs;
 });
+
+const openMediaInfo = () => {
+  layoutStore.showHover({
+    prompt: "mediainfo",
+    props: { url: props.url, name: props.name },
+  });
+};
+
+const openBDInfo = () => {
+  layoutStore.showHover({
+    prompt: "bdinfo",
+    props: { url: props.url, name: props.name },
+  });
+};
+
+const openFastDownload = () => {
+  layoutStore.showHover({
+    prompt: "download",
+    props: { urls: [props.url] },
+    confirm: (format: any) => {
+      layoutStore.closeHovers();
+      api.download(format, props.url);
+    },
+  });
+};
 
 const humanSize = () => {
   return props.type == "invalid_link" ? "invalid link" : filesize(props.size);

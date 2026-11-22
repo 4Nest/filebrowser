@@ -3,12 +3,12 @@
     <div class="card-title fb-media-header">
       <div class="fb-media-title-group">
         <h2>高速下载</h2>
-        <span class="fb-media-subtitle" v-if="signed">
+        <span class="fb-media-subtitle" v-if="signed" :title="signed.filename">
           {{ signed.filename }} · {{ signed.fileCount }} 个文件 · {{ humanSize(signed.totalSize) }}
         </span>
       </div>
       <div class="fb-ttl-select">
-        <label>链接有效期</label>
+        <label>有效期</label>
         <select v-model.number="ttlHours" @change="sign">
           <option :value="2">2 小时</option>
           <option :value="6">6 小时</option>
@@ -42,7 +42,7 @@
               <p class="fb-fastdl-desc">
                 {{
                   signed.mode === "file"
-                    ? "支持 HTTP Range 断点续传，丢进 IDM / Aria2 多线程直接跑满海外 VPS 带宽。"
+                    ? "支持 HTTP Range 断点续传，丢进 IDM / Aria2 多线程即可跑满海外 VPS 带宽。"
                     : "零服务器磁盘拷贝、零 CPU 压缩开销，支持 HTTP Range 与 IDM / Aria2 16 线程并发拉取，彻底消除碎文件 RTT 瓶颈。"
                 }}
               </p>
@@ -53,28 +53,33 @@
             </button>
           </div>
 
-          <div class="fb-cmd-row">
-            <span class="fb-cmd-label">IDM / 浏览器直链</span>
-            <code class="fb-cmd-code">{{ signed.url }}</code>
-            <button class="button button--flat fb-copy-btn" @click="copyText(signed.url, 'url')">
-              {{ copiedKey === "url" ? "已复制" : "复制" }}
-            </button>
-          </div>
+          <div class="fb-cmd-list">
+            <div class="fb-cmd-row" @click="copyText(signed.url, 'url')">
+              <span class="fb-cmd-label">IDM / 浏览器直链</span>
+              <span class="fb-cmd-preview" :title="signed.url">{{ signed.url }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.url, 'url')">
+                <i class="material-icons">{{ copiedKey === "url" ? "check" : "content_copy" }}</i>
+                <span>{{ copiedKey === "url" ? "已复制" : "复制" }}</span>
+              </button>
+            </div>
 
-          <div class="fb-cmd-row">
-            <span class="fb-cmd-label">Aria2 (16 线程)</span>
-            <code class="fb-cmd-code">{{ signed.aria2Cmd }}</code>
-            <button class="button button--flat fb-copy-btn" @click="copyText(signed.aria2Cmd, 'aria2')">
-              {{ copiedKey === "aria2" ? "已复制" : "复制" }}
-            </button>
-          </div>
+            <div class="fb-cmd-row" @click="copyText(signed.aria2Cmd, 'aria2')">
+              <span class="fb-cmd-label">Aria2 (16 线程)</span>
+              <span class="fb-cmd-preview" :title="signed.aria2Cmd">{{ signed.aria2Cmd }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.aria2Cmd, 'aria2')">
+                <i class="material-icons">{{ copiedKey === "aria2" ? "check" : "content_copy" }}</i>
+                <span>{{ copiedKey === "aria2" ? "已复制" : "复制" }}</span>
+              </button>
+            </div>
 
-          <div class="fb-cmd-row">
-            <span class="fb-cmd-label">curl 断点续传</span>
-            <code class="fb-cmd-code">{{ signed.curlCmd }}</code>
-            <button class="button button--flat fb-copy-btn" @click="copyText(signed.curlCmd, 'curl')">
-              {{ copiedKey === "curl" ? "已复制" : "复制" }}
-            </button>
+            <div class="fb-cmd-row" @click="copyText(signed.curlCmd, 'curl')">
+              <span class="fb-cmd-label">curl 断点续传</span>
+              <span class="fb-cmd-preview" :title="signed.curlCmd">{{ signed.curlCmd }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.curlCmd, 'curl')">
+                <i class="material-icons">{{ copiedKey === "curl" ? "check" : "content_copy" }}</i>
+                <span>{{ copiedKey === "curl" ? "已复制" : "复制" }}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -88,12 +93,15 @@
             </div>
           </div>
 
-          <div class="fb-cmd-row">
-            <span class="fb-cmd-label">一键并发拉取</span>
-            <code class="fb-cmd-code">{{ signed.aria2ManifestCmd }}</code>
-            <button class="button button--flat fb-copy-btn" @click="copyText(signed.aria2ManifestCmd!, 'manifest')">
-              {{ copiedKey === "manifest" ? "已复制" : "复制" }}
-            </button>
+          <div class="fb-cmd-list">
+            <div class="fb-cmd-row" @click="copyText(signed.aria2ManifestCmd!, 'manifest')">
+              <span class="fb-cmd-label">一键并发拉取</span>
+              <span class="fb-cmd-preview" :title="signed.aria2ManifestCmd">{{ signed.aria2ManifestCmd }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.aria2ManifestCmd!, 'manifest')">
+                <i class="material-icons">{{ copiedKey === "manifest" ? "check" : "content_copy" }}</i>
+                <span>{{ copiedKey === "manifest" ? "已复制" : "复制" }}</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { fetchJSON, removePrefix } from "./utils";
+import { fetchJSON, fetchURL, removePrefix } from "./utils";
 
 export interface MediaInfoSummary {
   format?: string;
@@ -19,13 +19,25 @@ export interface MediaInfoResponse {
   summary: MediaInfoSummary;
 }
 
+export interface BDInfoSummary {
+  discTitle?: string;
+  discSize?: string;
+  playlist?: string;
+  length?: string;
+  bitRate?: string;
+  video?: string;
+  audioCount: number;
+  subtitleCount: number;
+}
+
 export interface BDInfoTask {
   id: string;
   path: string;
   targetPath: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "canceled";
   progress: number;
   stage: string;
+  summary?: BDInfoSummary;
   quickSummary?: string;
   fullReport?: string;
   error?: string;
@@ -66,6 +78,12 @@ export async function startBDInfoScan(
 
 export async function getBDInfoTask(id: string): Promise<BDInfoTask> {
   return fetchJSON<BDInfoTask>(`/api/bdinfo/tasks/${encodeURIComponent(id)}`, {});
+}
+
+export async function cancelBDInfoTask(id: string): Promise<void> {
+  await fetchURL(`/api/bdinfo/tasks/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function signFastDownload(

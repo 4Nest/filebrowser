@@ -2,7 +2,7 @@
   <div class="card floating fb-media-modal" id="bdinfo-modal">
     <div class="card-title fb-media-header">
       <div class="fb-media-title-group">
-        <h2>BDInfo</h2>
+        <h2>BDInfo 原盘扫描</h2>
         <span class="fb-media-subtitle" :title="targetName">{{ targetName }}</span>
       </div>
       <div class="fb-media-actions" v-if="task?.status === 'done'">
@@ -16,7 +16,7 @@
         </button>
         <button class="button" @click="copyCurrent">
           <i class="material-icons">{{ copied ? "check" : "content_copy" }}</i>
-          <span>{{ copied ? "已复制" : tab === "quick" ? "复制 Quick Summary" : "复制完整报告" }}</span>
+          <span>{{ copied ? "已复制" : copyLabel }}</span>
         </button>
       </div>
     </div>
@@ -33,30 +33,53 @@
       <div v-else-if="!task || task.status === 'running'" class="fb-bdinfo-progress">
         <div class="fb-bdinfo-progress-top">
           <span class="fb-bdinfo-stage">{{ task?.stage || "正在初始化 BDInfo 扫描器…" }}</span>
-          <span class="fb-mono">{{ task?.progress ?? 5 }}% · {{ formatSec(task?.elapsedSec ?? 0) }}</span>
+          <span class="fb-mono fb-progress-meta">
+            {{ task?.progress ?? 5 }}% · {{ formatSec(task?.elapsedSec ?? 0) }}
+          </span>
         </div>
         <div class="fb-progress-track">
           <div class="fb-progress-fill" :style="{ width: `${task?.progress ?? 8}%` }"></div>
         </div>
-        <p class="fb-media-hint">
-          大型蓝光原盘扫描通常需要 15 秒至 2 分钟，结果将在服务端缓存 30 分钟；关闭窗口不会中断后台扫描。
-        </p>
+        <div class="fb-bdinfo-progress-foot">
+          <p class="fb-media-hint">
+            自动识别主播放列表并扫描码率，结果在服务端缓存 30 分钟；关闭窗口不会中断后台扫描。
+          </p>
+          <button v-if="task?.id" class="button button--flat" @click="cancelScan">
+            取消扫描
+          </button>
+        </div>
       </div>
 
       <template v-else-if="task.status === 'done'">
+        <div class="fb-media-badges" v-if="hasSummary">
+          <span v-if="task.summary?.playlist" class="fb-pill fb-pill--accent fb-mono">
+            {{ task.summary.playlist }}
+          </span>
+          <span v-if="task.summary?.discSize" class="fb-pill fb-mono">
+            {{ task.summary.discSize }}
+          </span>
+          <span v-if="task.summary?.length" class="fb-pill fb-mono">
+            {{ task.summary.length }}
+          </span>
+          <span v-if="task.summary?.bitRate" class="fb-pill fb-mono">
+            {{ task.summary.bitRate }}
+          </span>
+          <span v-if="task.summary?.audioCount" class="fb-pill">
+            Audio × {{ task.summary.audioCount }}
+          </span>
+          <span v-if="task.summary?.subtitleCount" class="fb-pill">
+            Sub × {{ task.summary.subtitleCount }}
+          </span>
+        </div>
+
         <div class="fb-tabs">
-          <button
-            class="fb-tab"
-            :class="{ active: tab === 'quick' }"
-            @click="tab = 'quick'"
-          >
-            Quick Summary（PT 推荐）
+          <button class="fb-tab" :class="{ active: tab === 'quick' }" @click="tab = 'quick'">
+            Quick Summary
           </button>
-          <button
-            class="fb-tab"
-            :class="{ active: tab === 'full' }"
-            @click="tab = 'full'"
-          >
+          <button class="fb-tab" :class="{ active: tab === 'bbcode' }" @click="tab = 'bbcode'">
+            BBCode 发种
+          </button>
+          <button class="fb-tab" :class="{ active: tab === 'full' }" @click="tab = 'full'">
             Full Report
           </button>
           <span class="fb-tab-meta fb-mono">耗时 {{ formatSec(task.elapsedSec) }}</span>
@@ -89,7 +112,7 @@ const layoutStore = useLayoutStore();
 
 const task = ref<BDInfoTask | null>(null);
 const errorMsg = ref("");
-const tab = ref<"quick" | "full">("quick");
+const tab = ref<"quick" | "bbcode" | "full">("quick");
 const copied = ref(false);
 let pollTimer: number | null = null;
 
@@ -108,11 +131,23 @@ const targetItem = computed(() => {
 
 const targetName = computed(() => targetItem.value.name);
 
+const hasSummary = computed(() => {
+  const s = task.value?.summary;
+  return !!(s && (s.playlist || s.discSize || s.length || s.bitRate));
+});
+
 const currentText = computed(() => {
   if (!task.value) return "";
-  return tab.value === "quick"
-    ? task.value.quickSummary || task.value.fullReport || ""
-    : task.value.fullReport || "";
+  const quick = task.value.quickSummary || task.value.fullReport || "";
+  if (tab.value === "quick") return quick;
+  if (tab.value === "bbcode") return `[quote][code]\n${quick}\n[/code][/quote]`;
+  return task.value.fullReport || "";
+});
+
+const copyLabel = computed(() => {
+  if (tab.value === "quick") return "复制 Quick Summary";
+  if (tab.value === "bbcode") return "复制 BBCode";
+  return "复制完整报告";
 });
 
 const formatSec = (s: number) => `${s.toFixed(1)}s`;
@@ -143,19 +178,30 @@ const start = async (force = false) => {
           task.value = updated;
           if (updated.status === "done") {
             stopPoll();
-          } else if (updated.status === "error") {
-            errorMsg.value = updated.error || "BDInfo 扫描失败";
+          } else if (updated.status === "error" || updated.status === "canceled") {
+            errorMsg.value = updated.error || "扫描已取消";
             stopPoll();
           }
         } catch (err: any) {
           errorMsg.value = err?.message || String(err);
           stopPoll();
         }
-      }, 1500);
+      }, 1200);
     }
   } catch (e: any) {
     errorMsg.value = e?.message || String(e);
   }
+};
+
+const cancelScan = async () => {
+  if (!task.value?.id) return;
+  stopPoll();
+  try {
+    await mediaApi.cancelBDInfoTask(task.value.id);
+  } catch {
+    // ignore
+  }
+  layoutStore.closeHovers();
 };
 
 const copyCurrent = async () => {
