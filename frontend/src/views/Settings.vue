@@ -1,57 +1,24 @@
 <template>
-  <div class="dashboard">
-    <header-bar showMenu showLogo>
-      <title>{{ t("sidebar.settings") }}</title>
-      <template #actions>
-        <action
-          :icon="isDark ? 'light_mode' : 'dark_mode'"
-          :label="isDark ? '浅色模式' : '暗黑模式'"
-          @action="toggleTheme"
-        />
-      </template>
-    </header-bar>
-
-    <div id="nav">
-      <div class="wrapper">
-        <ul>
-          <router-link to="/settings/profile"
-            ><li :class="{ active: $route.path === '/settings/profile' }">
-              {{ t("settings.profileSettings") }}
-            </li></router-link
-          >
-          <router-link to="/settings/shares" v-if="user?.perm.share"
-            ><li :class="{ active: $route.path === '/settings/shares' }">
-              {{ t("settings.shareManagement") }}
-            </li></router-link
-          >
-          <router-link to="/settings/global" v-if="user?.perm.admin"
-            ><li :class="{ active: $route.path === '/settings/global' }">
-              {{ t("settings.globalSettings") }}
-            </li></router-link
-          >
-          <router-link to="/settings/users" v-if="user?.perm.admin"
-            ><li
-              :class="{
-                active:
-                  $route.path === '/settings/users' || $route.name === 'User',
-              }"
-            >
-              {{ t("settings.userManagement") }}
-            </li></router-link
-          >
-        </ul>
+  <div class="fb-settings-page dashboard">
+    <div class="fb-page-header">
+      <div class="fb-page-header-left">
+        <button
+          type="button"
+          class="fb-icon-btn fb-mobile-menu"
+          @click="layoutStore.showHover('sidebar')"
+        >
+          <i class="material-icons">menu</i>
+        </button>
+        <div>
+          <h1>{{ pageMeta.title }}</h1>
+          <p class="fb-page-sub">{{ pageMeta.sub }}</p>
+        </div>
       </div>
     </div>
 
-    <div v-if="loading">
-      <h2 class="message delayed">
-        <div class="spinner">
-          <div class="bounce1"></div>
-          <div class="bounce2"></div>
-          <div class="bounce3"></div>
-        </div>
-        <span>{{ t("files.loading") }}</span>
-      </h2>
+    <div v-if="loading" class="fb-loading-state">
+      <div class="fb-spinner"></div>
+      <span>{{ t("files.loading") }}</span>
     </div>
 
     <router-view></router-view>
@@ -59,26 +26,46 @@
 </template>
 
 <script setup lang="ts">
-import { useAuthStore } from "@/stores/auth";
 import { useLayoutStore } from "@/stores/layout";
-import HeaderBar from "@/components/header/HeaderBar.vue";
-import Action from "@/components/header/Action.vue";
-import { getTheme, getMediaPreference, setTheme } from "@/utils/theme";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 const { t } = useI18n();
-
-const authStore = useAuthStore();
+const route = useRoute();
 const layoutStore = useLayoutStore();
 
-const user = computed(() => authStore.user);
 const loading = computed(() => layoutStore.loading);
 
-const isDark = ref((getTheme() || getMediaPreference()) === "dark");
-const toggleTheme = () => {
-  const next = isDark.value ? "light" : "dark";
-  setTheme(next);
-  isDark.value = next === "dark";
-};
+const pageMeta = computed(() => {
+  const p = route.path;
+  if (p === "/settings/profile") {
+    return {
+      title: t("settings.profileSettings"),
+      sub: "自定义外观浏览习惯、媒体与高速下载偏好以及登录密码",
+    };
+  }
+  if (p === "/settings/shares") {
+    return {
+      title: t("settings.shareManagement"),
+      sub: "管理所有已创建的公开分享链接，随时复制或撤销",
+    };
+  }
+  if (p === "/settings/global") {
+    return {
+      title: t("settings.globalSettings"),
+      sub: "实例名称、注册与安全策略、分片传输及高级访问规则",
+    };
+  }
+  if (p.startsWith("/settings/users")) {
+    return {
+      title: t("settings.userManagement"),
+      sub: "管理成员账号、根目录范围与操作权限",
+    };
+  }
+  return {
+    title: t("sidebar.settings"),
+    sub: "",
+  };
+});
 </script>

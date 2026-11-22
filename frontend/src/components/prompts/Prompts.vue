@@ -31,6 +31,7 @@ import ResolveConflict from "./ResolveConflict.vue";
 import CurrentPassword from "./CurrentPassword.vue";
 import MediaInfo from "./MediaInfo.vue";
 import BDInfo from "./BDInfo.vue";
+import Screenshot from "./Screenshot.vue";
 
 const layoutStore = useLayoutStore();
 
@@ -56,6 +57,7 @@ const components = new Map<string, any>([
   ["current-password", CurrentPassword],
   ["mediainfo", MediaInfo],
   ["bdinfo", BDInfo],
+  ["screenshot", Screenshot],
 ]);
 
 const modal = computed(() => {

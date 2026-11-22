@@ -63,10 +63,10 @@
               </button>
             </div>
 
-            <div class="fb-cmd-row" @click="copyText(signed.aria2Cmd, 'aria2')">
-              <span class="fb-cmd-label">Aria2 (16 线程)</span>
-              <span class="fb-cmd-preview" :title="signed.aria2Cmd">{{ signed.aria2Cmd }}</span>
-              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.aria2Cmd, 'aria2')">
+            <div class="fb-cmd-row" @click="copyText(effectiveAria2Cmd, 'aria2')">
+              <span class="fb-cmd-label">Aria2 ({{ prefs.aria2Threads }} 线程)</span>
+              <span class="fb-cmd-preview" :title="effectiveAria2Cmd">{{ effectiveAria2Cmd }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(effectiveAria2Cmd, 'aria2')">
                 <i class="material-icons">{{ copiedKey === "aria2" ? "check" : "content_copy" }}</i>
                 <span>{{ copiedKey === "aria2" ? "已复制" : "复制" }}</span>
               </button>
@@ -94,10 +94,10 @@
           </div>
 
           <div class="fb-cmd-list">
-            <div class="fb-cmd-row" @click="copyText(signed.aria2ManifestCmd!, 'manifest')">
+            <div class="fb-cmd-row" @click="copyText(effectiveManifestCmd, 'manifest')">
               <span class="fb-cmd-label">一键并发拉取</span>
-              <span class="fb-cmd-preview" :title="signed.aria2ManifestCmd">{{ signed.aria2ManifestCmd }}</span>
-              <button class="button button--flat fb-copy-btn" @click.stop="copyText(signed.aria2ManifestCmd!, 'manifest')">
+              <span class="fb-cmd-preview" :title="effectiveManifestCmd">{{ effectiveManifestCmd }}</span>
+              <button class="button button--flat fb-copy-btn" @click.stop="copyText(effectiveManifestCmd, 'manifest')">
                 <i class="material-icons">{{ copiedKey === "manifest" ? "check" : "content_copy" }}</i>
                 <span>{{ copiedKey === "manifest" ? "已复制" : "复制" }}</span>
               </button>
@@ -138,16 +138,33 @@ import { media as mediaApi } from "@/api";
 import type { FastDLSignResponse } from "@/api/media";
 import { copy } from "@/utils/clipboard";
 import { filesize } from "@/utils";
+import { getLocalPrefs } from "@/utils/prefs";
 
 const route = useRoute();
 const fileStore = useFileStore();
 const layoutStore = useLayoutStore();
 
+const prefs = getLocalPrefs();
 const loading = ref(true);
 const errorMsg = ref("");
 const signed = ref<FastDLSignResponse | null>(null);
-const ttlHours = ref(6);
+const ttlHours = ref(prefs.fastdlTtlHours);
 const copiedKey = ref("");
+
+const effectiveAria2Cmd = computed(() => {
+  if (!signed.value) return "";
+  const t = prefs.aria2Threads;
+  return signed.value.aria2Cmd.replace(/-x \d+ -s \d+/, `-x ${t} -s ${t}`);
+});
+
+const effectiveManifestCmd = computed(() => {
+  if (!signed.value?.aria2ManifestCmd) return "";
+  const t = prefs.aria2Threads;
+  return signed.value.aria2ManifestCmd.replace(
+    /-x \d+ -s \d+/,
+    `-x ${t} -s ${t}`
+  );
+});
 
 const formats = {
   vtar: "tar (高速可续传)",

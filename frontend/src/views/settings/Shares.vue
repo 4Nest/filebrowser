@@ -1,65 +1,65 @@
 <template>
   <errors v-if="error" :errorCode="error.status" />
-  <div class="row" v-else-if="!layoutStore.loading">
-    <div class="column">
-      <div class="card">
-        <div class="card-title">
-          <h2>{{ t("settings.shareManagement") }}</h2>
-        </div>
-
-        <div class="card-content full" v-if="links.length > 0">
-          <table>
-            <tr>
-              <th>{{ t("settings.path") }}</th>
-              <th>{{ t("settings.shareDuration") }}</th>
-              <th v-if="authStore.user?.perm.admin">
-                {{ t("settings.username") }}
-              </th>
-              <th></th>
-              <th></th>
-            </tr>
-
-            <tr v-for="link in links" :key="link.hash">
-              <td>
-                <a :href="buildLink(link)" target="_blank">{{ link.path }}</a>
-              </td>
-              <td>
-                <template v-if="link.expire !== 0">{{
-                  humanTime(link.expire)
-                }}</template>
-                <template v-else>{{ t("permanent") }}</template>
-              </td>
-              <td v-if="authStore.user?.perm.admin">{{ link.username }}</td>
-              <td class="small">
-                <button
-                  class="action"
-                  @click="deleteLink($event, link)"
-                  :aria-label="t('buttons.delete')"
-                  :title="t('buttons.delete')"
-                >
-                  <i class="material-icons">delete</i>
-                </button>
-              </td>
-              <td class="small">
-                <button
-                  class="action copy-clipboard"
-                  :aria-label="t('buttons.copyToClipboard')"
-                  :title="t('buttons.copyToClipboard')"
-                  @click="copyToClipboard(buildLink(link))"
-                >
-                  <i class="material-icons">content_paste</i>
-                </button>
-              </td>
-            </tr>
-          </table>
-        </div>
-        <h2 class="message" v-else>
-          <i class="material-icons">sentiment_dissatisfied</i>
-          <span>{{ t("files.lonely") }}</span>
-        </h2>
+  <section v-else-if="!layoutStore.loading" class="fb-settings-section">
+    <div class="fb-section-head" v-if="links.length > 0">
+      <div>
+        <h2>有效分享列表</h2>
       </div>
+      <span class="fb-pill fb-mono">共 {{ links.length }} 条</span>
     </div>
-  </div>
+
+    <div class="fb-table-container" v-if="links.length > 0">
+      <table class="fb-clean-table">
+        <thead>
+          <tr>
+            <th>{{ t("settings.path") }}</th>
+            <th>{{ t("settings.shareDuration") }}</th>
+            <th v-if="authStore.user?.perm.admin">创建者</th>
+            <th class="fb-th-right">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="link in links" :key="link.hash">
+            <td class="fb-mono">
+              <a :href="buildLink(link)" target="_blank" class="fb-table-link">
+                {{ link.path }}
+              </a>
+            </td>
+            <td class="fb-mono">
+              <template v-if="link.expire !== 0">{{
+                humanTime(link.expire)
+              }}</template>
+              <template v-else>{{ t("permanent") }}</template>
+            </td>
+            <td v-if="authStore.user?.perm.admin">{{ link.username }}</td>
+            <td class="fb-td-actions">
+              <button
+                type="button"
+                class="fb-tool-btn"
+                @click="copyToClipboard(buildLink(link))"
+              >
+                <i class="material-icons">content_copy</i>
+                <span>复制</span>
+              </button>
+              <button
+                type="button"
+                class="fb-tool-btn fb-tool-btn--danger"
+                @click="deleteLink($event, link)"
+              >
+                <i class="material-icons">delete_outline</i>
+                <span>撤销</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fb-empty-state" v-else>
+      <i class="material-icons">link_off</i>
+      <p>当前没有生效中的公开分享链接</p>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -85,7 +85,6 @@ const links = ref<Share[]>([]);
 
 onMounted(async () => {
   layoutStore.loading = true;
-
   try {
     const newLinks = await api.list();
     if (authStore.user?.perm.admin) {
@@ -99,9 +98,7 @@ onMounted(async () => {
     }
     links.value = newLinks;
   } catch (err) {
-    if (err instanceof Error) {
-      error.value = err;
-    }
+    if (err instanceof Error) error.value = err;
   } finally {
     layoutStore.loading = false;
   }
@@ -109,51 +106,32 @@ onMounted(async () => {
 
 const copyToClipboard = (text: string) => {
   copy({ text }).then(
-    () => {
-      // clipboard successfully set
-      $showSuccess(t("success.linkCopied"));
-    },
-    () => {
-      // clipboard write failed
+    () => $showSuccess(t("success.linkCopied")),
+    () =>
       copy({ text }, { permission: true }).then(
-        () => {
-          // clipboard successfully set
-          $showSuccess(t("success.linkCopied"));
-        },
-        (e) => {
-          // clipboard write failed
-          $showError(e);
-        }
-      );
-    }
+        () => $showSuccess(t("success.linkCopied")),
+        (e) => $showError(e)
+      )
   );
 };
 
 const deleteLink = async (event: Event, link: any) => {
   event.preventDefault();
-
   layoutStore.showHover({
     prompt: "share-delete",
     confirm: () => {
       layoutStore.closeHovers();
-
       try {
         api.remove(link.hash);
         links.value = links.value.filter((item) => item.hash !== link.hash);
         $showSuccess(t("settings.shareDeleted"));
       } catch (err) {
-        if (err instanceof Error) {
-          $showError(err);
-        }
+        if (err instanceof Error) $showError(err);
       }
     },
   });
 };
-const humanTime = (time: number) => {
-  return dayjs(time * 1000).fromNow();
-};
 
-const buildLink = (share: Share) => {
-  return api.getShareURL(share);
-};
+const humanTime = (time: number) => dayjs(time * 1000).fromNow();
+const buildLink = (share: Share) => api.getShareURL(share);
 </script>

@@ -105,6 +105,7 @@ import { useLayoutStore } from "@/stores/layout";
 import { media as mediaApi } from "@/api";
 import type { BDInfoTask } from "@/api/media";
 import { copy } from "@/utils/clipboard";
+import { getLocalPrefs } from "@/utils/prefs";
 
 const route = useRoute();
 const fileStore = useFileStore();
@@ -112,7 +113,7 @@ const layoutStore = useLayoutStore();
 
 const task = ref<BDInfoTask | null>(null);
 const errorMsg = ref("");
-const tab = ref<"quick" | "bbcode" | "full">("quick");
+const tab = ref<"quick" | "bbcode" | "full">(getLocalPrefs().bdinfoDefaultTab);
 const copied = ref(false);
 let pollTimer: number | null = null;
 

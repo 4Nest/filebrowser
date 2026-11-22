@@ -87,6 +87,9 @@ func NewHandler(
 	api.Handle("/bdinfo/scan", monkey(bdInfoScanHandler, "")).Methods("POST")
 	api.Handle("/bdinfo/tasks/{id}", monkey(bdInfoTaskHandler, "")).Methods("GET")
 	api.Handle("/bdinfo/tasks/{id}", monkey(bdInfoCancelHandler, "")).Methods("DELETE")
+	api.Handle("/screenshots/capture", monkey(screenshotCaptureHandler, "")).Methods("POST")
+	api.Handle("/screenshots/file/{id}", monkey(screenshotFileHandler, "")).Methods("GET")
+	api.Handle("/screenshots/upload", monkey(screenshotUploadHandler, "")).Methods("POST")
 	api.Handle("/fastdl/sign", monkey(fastDLSignHandler, "")).Methods("POST")
 	api.Handle("/fastdl/{token}/{filename:.*}", monkey(fastDLServeHandler, "")).Methods("GET", "HEAD")
 	api.PathPrefix("/preview/{size}/{path:.*}").

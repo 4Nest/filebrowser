@@ -1,4 +1,5 @@
 import { fetchJSON, fetchURL, removePrefix } from "./utils";
+import type { ImageHostPreset } from "@/utils/prefs";
 
 export interface MediaInfoSummary {
   format?: string;
@@ -59,6 +60,55 @@ export interface FastDLSignResponse {
   aria2ManifestCmd?: string;
 }
 
+export interface ScreenshotCaptureParams {
+  count: number;
+  format: "png" | "jpg" | "webp";
+  quality: number;
+  startPct: number;
+  endPct: number;
+  timestamps?: string[];
+  hdrToneMap: "auto" | "on" | "off";
+  width: number;
+}
+
+export interface ScreenshotItem {
+  id: string;
+  index: number;
+  timestamp: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  width: number;
+  height: number;
+  previewUrl: string;
+}
+
+export interface ScreenshotCaptureResponse {
+  path: string;
+  source: string;
+  duration: number;
+  isHdr: boolean;
+  toneMapApplied: boolean;
+  items: ScreenshotItem[];
+}
+
+export interface UploadedShotResult {
+  shotId: string;
+  filename: string;
+  url?: string;
+  thumbUrl?: string;
+  bbcode?: string;
+  markdown?: string;
+  error?: string;
+}
+
+export interface ScreenshotUploadResponse {
+  results: UploadedShotResult[];
+  bbcode: string;
+  markdown: string;
+  direct: string;
+}
+
 export async function getMediaInfo(url: string): Promise<MediaInfoResponse> {
   const path = removePrefix(url);
   return fetchJSON<MediaInfoResponse>(`/api/mediainfo${path}`, {});
@@ -68,7 +118,7 @@ export async function startBDInfoScan(
   url: string,
   force = false
 ): Promise<BDInfoTask> {
-  const path = removePrefix(url);
+  const path = decodeURIComponent(removePrefix(url));
   return fetchJSON<BDInfoTask>("/api/bdinfo/scan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -99,5 +149,39 @@ export async function signFastDownload(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths, mode, ttlHours }),
+  });
+}
+
+export async function captureScreenshots(
+  url: string,
+  params: ScreenshotCaptureParams
+): Promise<ScreenshotCaptureResponse> {
+  const path = decodeURIComponent(removePrefix(url));
+  return fetchJSON<ScreenshotCaptureResponse>("/api/screenshots/capture", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, ...params }),
+  });
+}
+
+export async function uploadScreenshots(
+  shotIds: string[],
+  host: ImageHostPreset
+): Promise<ScreenshotUploadResponse> {
+  return fetchJSON<ScreenshotUploadResponse>("/api/screenshots/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      shotIds,
+      host: {
+        provider: host.provider,
+        endpoint: host.endpoint,
+        apiKey: host.apiKey,
+        fieldName: host.fieldName,
+        authHeader: host.authHeader,
+        authPrefix: host.authPrefix,
+        urlJsonPath: host.urlJsonPath,
+      },
+    }),
   });
 }

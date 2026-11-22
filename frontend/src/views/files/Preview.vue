@@ -58,6 +58,12 @@
         />
         <action
           :disabled="layoutStore.loading"
+          icon="photo_camera"
+          label="截图"
+          show="screenshot"
+        />
+        <action
+          :disabled="layoutStore.loading"
           icon="analytics"
           label="MediaInfo"
           show="mediainfo"

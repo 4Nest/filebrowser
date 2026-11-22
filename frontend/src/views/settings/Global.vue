@@ -1,179 +1,147 @@
 <template>
   <errors v-if="error" :errorCode="error.status" />
-  <div class="row" v-else-if="!layoutStore.loading && settings !== null">
-    <div class="column">
-      <form class="card" @submit.prevent="save">
-        <div class="card-title">
-          <h2>{{ t("settings.globalSettings") }}</h2>
+  <form
+    v-else-if="!layoutStore.loading && settings !== null"
+    class="fb-settings-stack"
+    @submit.prevent="save"
+  >
+    <!-- 实例与访问安全 -->
+    <section class="fb-settings-section">
+      <div class="fb-section-head">
+        <div>
+          <h2>实例与安全</h2>
+          <p>控制站点名称、注册开关与密码安全策略</p>
+        </div>
+        <button class="button" type="submit">
+          <i class="material-icons">check</i>
+          <span>保存全局设置</span>
+        </button>
+      </div>
+
+      <div class="fb-setting-list">
+        <div class="fb-setting-row">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">实例名称</span>
+            <span class="fb-setting-desc">显示在登录页与浏览器标签页的标题</span>
+          </div>
+          <div class="fb-setting-control">
+            <input
+              class="input"
+              type="text"
+              v-model="settings.branding.name"
+              placeholder="File Browser"
+            />
+          </div>
         </div>
 
-        <div class="card-content">
-          <p>
-            <input type="checkbox" v-model="settings.signup" />
-            {{ t("settings.allowSignup") }}
-          </p>
+        <label class="fb-setting-row fb-setting-row--click">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">允许公开注册</span>
+            <span class="fb-setting-desc">私人 VPS 强烈建议保持关闭</span>
+          </div>
+          <input type="checkbox" class="fb-switch" v-model="settings.signup" />
+        </label>
 
-          <p>
-            <input type="checkbox" v-model="settings.createUserDir" />
-            {{ t("settings.createUserDir") }}
-          </p>
+        <label class="fb-setting-row fb-setting-row--click">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">在公开分享页隐藏登录按钮</span>
+            <span class="fb-setting-desc">访客打开分享链接时不显示侧栏登录入口</span>
+          </div>
+          <input
+            type="checkbox"
+            class="fb-switch"
+            v-model="settings.hideLoginButton"
+          />
+        </label>
 
-          <p>
-            <input type="checkbox" v-model="settings.hideLoginButton" />
-            {{ t("settings.hideLoginButton") }}
-          </p>
+        <label class="fb-setting-row fb-setting-row--click">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">隐藏侧栏磁盘容量卡片</span>
+            <span class="fb-setting-desc">关闭后左侧栏底部不再展示存储占用统计</span>
+          </div>
+          <input
+            type="checkbox"
+            class="fb-switch"
+            v-model="settings.branding.disableUsedPercentage"
+          />
+        </label>
 
-          <p>
-            <label class="small">{{ t("settings.userHomeBasePath") }}</label>
-            <input
-              class="input input--block"
-              type="text"
-              v-model="settings.userHomeBasePath"
-            />
-          </p>
-
-          <p>
-            <label for="minimumPasswordLength">{{
-              t("settings.minimumPasswordLength")
-            }}</label>
+        <div class="fb-setting-row">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">最小密码长度</span>
+            <span class="fb-setting-desc">新建用户或修改密码时的最低字符要求</span>
+          </div>
+          <div class="fb-setting-control fb-setting-control--sm">
             <vue-number-input
               controls
               v-model.number="settings.minimumPasswordLength"
-              id="minimumPasswordLength"
-              :min="1"
-            />
-          </p>
-
-          <h3>{{ t("settings.rules") }}</h3>
-          <p class="small">{{ t("settings.globalRules") }}</p>
-          <rules v-model:rules="settings.rules" />
-
-          <div v-if="enableExec">
-            <h3>{{ t("settings.executeOnShell") }}</h3>
-            <p class="small">{{ t("settings.executeOnShellDescription") }}</p>
-            <input
-              class="input input--block"
-              type="text"
-              placeholder="bash -c, cmd /c, ..."
-              v-model="shellValue"
+              :min="4"
             />
           </div>
+        </div>
+      </div>
+    </section>
 
-          <h3>{{ t("settings.branding") }}</h3>
+    <!-- 上传与断点续传 -->
+    <section class="fb-settings-section">
+      <div class="fb-section-head">
+        <div>
+          <h2>上传与分片传输 (TUS)</h2>
+          <p>优化海外 VPS 大文件上传的稳定性与分片吞吐</p>
+        </div>
+      </div>
 
-          <i18n-t
-            keypath="settings.brandingHelp"
-            tag="p"
-            class="small"
-            scope="global"
-          >
-            <a
-              class="link"
-              target="_blank"
-              href="https://github.com/filebrowser/filebrowser/blob/master/docs/customization.md#custom-branding"
-              >{{ t("settings.documentation") }}</a
+      <div class="fb-setting-list">
+        <div class="fb-setting-row">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">分片大小</span>
+            <span class="fb-setting-desc"
+              >支持 10MB、20MB 等格式，跨国网络建议 10MB–20MB</span
             >
-          </i18n-t>
-
-          <p>
+          </div>
+          <div class="fb-setting-control fb-setting-control--sm">
             <input
-              type="checkbox"
-              v-model="settings.branding.disableExternal"
-              id="branding-links"
-            />
-            {{ t("settings.disableExternalLinks") }}
-          </p>
-
-          <p>
-            <input
-              type="checkbox"
-              v-model="settings.branding.disableUsedPercentage"
-              id="branding-used-disk"
-            />
-            {{ t("settings.disableUsedDiskPercentage") }}
-          </p>
-
-          <p>
-            <label for="theme">{{ t("settings.themes.title") }}</label>
-            <themes
-              class="input input--block"
-              v-model:theme="settings.branding.theme"
-              id="theme"
-            ></themes>
-          </p>
-
-          <p>
-            <label for="branding-name">{{ t("settings.instanceName") }}</label>
-            <input
-              class="input input--block"
+              class="input fb-mono"
               type="text"
-              v-model="settings.branding.name"
-              id="branding-name"
+              v-model="formattedChunkSize"
+              id="tus-chunkSize"
             />
-          </p>
-
-          <p>
-            <label for="branding-files">{{
-              t("settings.brandingDirectoryPath")
-            }}</label>
-            <input
-              class="input input--block"
-              type="text"
-              v-model="settings.branding.files"
-              id="branding-files"
-            />
-          </p>
-
-          <h3>{{ t("settings.tusUploads") }}</h3>
-
-          <p class="small">{{ t("settings.tusUploadsHelp") }}</p>
-
-          <div class="tusConditionalSettings">
-            <p>
-              <label for="tus-chunkSize">{{
-                t("settings.tusUploadsChunkSize")
-              }}</label>
-              <input
-                class="input input--block"
-                type="text"
-                v-model="formattedChunkSize"
-                id="tus-chunkSize"
-              />
-            </p>
-
-            <p>
-              <label for="tus-retryCount">{{
-                t("settings.tusUploadsRetryCount")
-              }}</label>
-              <vue-number-input
-                controls
-                v-model.number="settings.tus.retryCount"
-                id="tus-retryCount"
-                :min="0"
-              />
-            </p>
           </div>
         </div>
 
-        <div class="card-action">
-          <input
-            class="button button--flat"
-            type="submit"
-            :value="t('buttons.update')"
-          />
+        <div class="fb-setting-row">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">分片失败重试次数</span>
+            <span class="fb-setting-desc">网络抖动时单个分片的最大自动重试次数</span>
+          </div>
+          <div class="fb-setting-control fb-setting-control--sm">
+            <vue-number-input
+              controls
+              v-model.number="settings.tus.retryCount"
+              :min="0"
+            />
+          </div>
         </div>
-      </form>
-    </div>
+      </div>
+    </section>
 
-    <div class="column">
-      <form class="card" @submit.prevent="save">
-        <div class="card-title">
-          <h2>{{ t("settings.userDefaults") }}</h2>
+    <!-- 高级设置（折叠收起） -->
+    <details class="fb-settings-details">
+      <summary>
+        <span>高级配置：路径过滤规则与新用户默认模板</span>
+        <i class="material-icons">expand_more</i>
+      </summary>
+
+      <div class="fb-settings-details-body">
+        <div class="fb-sub-block">
+          <h3>全局路径访问规则</h3>
+          <p class="fb-setting-desc">通过正则表达式隐藏或限制特定路径的访问</p>
+          <rules v-model:rules="settings.rules" />
         </div>
 
-        <div class="card-content">
-          <p class="small">{{ t("settings.defaultUserDescription") }}</p>
-
+        <div class="fb-sub-block">
+          <h3>新用户默认权限模板</h3>
+          <p class="fb-setting-desc">创建新成员账号时自动套用的初始权限</p>
           <user-form
             :isNew="false"
             :isDefault="true"
@@ -181,99 +149,41 @@
           />
         </div>
 
-        <div class="card-action">
+        <div class="fb-sub-block" v-if="enableExec">
+          <h3>Shell 执行前缀</h3>
+          <p class="fb-setting-desc">例如 bash -c</p>
           <input
-            class="button button--flat"
-            type="submit"
-            :value="t('buttons.update')"
+            class="input input--block"
+            type="text"
+            placeholder="bash -c"
+            v-model="shellValue"
           />
         </div>
-      </form>
-    </div>
-
-    <div class="column">
-      <form v-if="enableExec" class="card" @submit.prevent="save">
-        <div class="card-title">
-          <h2>{{ t("settings.commandRunner") }}</h2>
-        </div>
-
-        <div class="card-content">
-          <i18n-t
-            keypath="settings.commandRunnerHelp"
-            tag="p"
-            class="small"
-            scope="global"
-          >
-            <code>FILE</code>
-            <code>SCOPE</code>
-            <a
-              class="link"
-              target="_blank"
-              href="https://github.com/filebrowser/filebrowser/blob/master/docs/command-execution.md#hook-runner"
-              >{{ t("settings.documentation") }}</a
-            >
-          </i18n-t>
-
-          <div
-            v-for="(command, key) in settings.commands"
-            :key="key"
-            class="collapsible"
-          >
-            <input :id="key" type="checkbox" />
-            <label :for="key">
-              <p>{{ capitalize(key) }}</p>
-              <i class="material-icons">arrow_drop_down</i>
-            </label>
-            <div class="collapse">
-              <textarea
-                class="input input--block input--textarea"
-                v-model.trim="commandObject[key]"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="card-action">
-          <input
-            class="button button--flat"
-            type="submit"
-            :value="t('buttons.update')"
-          />
-        </div>
-      </form>
-    </div>
-  </div>
+      </div>
+    </details>
+  </form>
 </template>
 
 <script setup lang="ts">
 import { settings as api } from "@/api";
 import { StatusError } from "@/api/utils";
 import Rules from "@/components/settings/Rules.vue";
-import Themes from "@/components/settings/Themes.vue";
 import UserForm from "@/components/settings/UserForm.vue";
 import { useLayoutStore } from "@/stores/layout";
 import { enableExec } from "@/utils/constants";
-import { getTheme, setTheme } from "@/utils/theme";
 import Errors from "@/views/Errors.vue";
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 const error = ref<StatusError | null>(null);
-const originalSettings = ref<ISettings | null>(null);
 const settings = ref<ISettings | null>(null);
 const debounceTimeout = ref<number | null>(null);
 const pendingChunkSize = ref<string | null>(null);
-
-const commandObject = ref<{
-  [key: string]: string[] | string;
-}>({});
 const shellValue = ref<string>("");
 
 const $showError = inject<IToastError>("$showError")!;
 const $showSuccess = inject<IToastSuccess>("$showSuccess")!;
-
 const { t } = useI18n();
-
 const layoutStore = useLayoutStore();
 
 const formattedChunkSize = computed({
@@ -283,48 +193,22 @@ const formattedChunkSize = computed({
       : "";
   },
   set(value: string) {
-    // Use debouncing to allow the user to type freely without
-    // interruption by the formatter
-    // Clear the previous timeout if it exists
-    if (debounceTimeout.value) {
-      clearTimeout(debounceTimeout.value);
-    }
-
+    if (debounceTimeout.value) clearTimeout(debounceTimeout.value);
     pendingChunkSize.value = value;
-
-    // Set a new timeout to apply the format after a short delay
-    debounceTimeout.value = window.setTimeout(applyChunkSize, 1500);
+    debounceTimeout.value = window.setTimeout(applyChunkSize, 1200);
   },
 });
 
-// applyChunkSize commits what the user typed. Saving must flush it first:
-// otherwise submitting within the debounce window persists the previous value,
-// and the setting appears to refuse the change.
 const applyChunkSize = () => {
   if (debounceTimeout.value) {
     clearTimeout(debounceTimeout.value);
     debounceTimeout.value = null;
   }
-
   if (pendingChunkSize.value === null) return;
-
   if (settings.value) {
     settings.value.tus.chunkSize = parseBytes(pendingChunkSize.value);
   }
   pendingChunkSize.value = null;
-};
-
-// Define funcs
-const capitalize = (name: string, where: string | RegExp = "_") => {
-  if (where === "caps") where = /(?=[A-Z])/;
-  const split = name.split(where);
-  name = "";
-
-  for (let i = 0; i < split.length; i++) {
-    name += split[i].charAt(0).toUpperCase() + split[i].slice(1) + " ";
-  }
-
-  return name.slice(0, -1);
 };
 
 const save = async () => {
@@ -332,64 +216,29 @@ const save = async () => {
   applyChunkSize();
   const newSettings: ISettings = {
     ...settings.value,
-    shell:
-      settings.value?.shell
-        .join(" ")
-        .trim()
-        .split(" ")
-        .filter((s: string) => s !== "") ?? [],
-    commands: {},
+    shell: shellValue.value
+      .trim()
+      .split(" ")
+      .filter((s) => s !== ""),
   };
-
-  const keys = Object.keys(settings.value.commands) as Array<
-    keyof SettingsCommand
-  >;
-  for (const key of keys) {
-    // not sure if we can safely assume non-null
-    const newValue = commandObject.value[key];
-    if (!newValue) continue;
-
-    if (Array.isArray(newValue)) {
-      newSettings.commands[key] = newValue;
-    } else if (key in commandObject.value) {
-      newSettings.commands[key] = newValue
-        .split("\n")
-        .filter((cmd: string) => cmd !== "");
-    }
-  }
-  newSettings.shell = shellValue.value
-    .trim()
-    .split(" ")
-    .filter((s) => s !== "");
-
-  if (newSettings.branding.theme !== getTheme()) {
-    setTheme(newSettings.branding.theme);
-  }
-
   try {
     await api.update(newSettings);
     $showSuccess(t("settings.settingsUpdated"));
   } catch (e: any) {
     $showError(e);
   }
-
   return true;
 };
-// Parse the user-friendly input (e.g., "20M" or "1T") to bytes
+
 const parseBytes = (input: string) => {
   const regex = /^(\d+)(\.\d+)?(B|K|KB|M|MB|G|GB|T|TB)?$/i;
   const matches = input.match(regex);
   if (matches) {
     const size = parseFloat(matches[1].concat(matches[2] || ""));
-    // The unit is optional: a bare number is already a count of bytes. Reading
-    // it unguarded throws, and the throw happens inside the debounce callback,
-    // so the setting is silently never updated.
     let unit: keyof SettingsUnit = (
       matches[3] ?? "B"
     ).toUpperCase() as keyof SettingsUnit;
-    if (!unit.endsWith("B")) {
-      unit += "B";
-    }
+    if (!unit.endsWith("B")) unit += "B";
     const units: SettingsUnit = {
       KB: 1024,
       MB: 1024 ** 2,
@@ -397,11 +246,10 @@ const parseBytes = (input: string) => {
       TB: 1024 ** 4,
     };
     return size * (units[unit as keyof SettingsUnit] || 1);
-  } else {
-    return 1024 ** 2;
   }
+  return 1024 ** 2;
 };
-// Format the chunk size in bytes to user-friendly format
+
 const formatBytes = (bytes: number) => {
   const units = ["B", "KB", "MB", "GB", "TB"];
   let size = bytes;
@@ -413,36 +261,20 @@ const formatBytes = (bytes: number) => {
   return `${size}${units[unitIndex]}`;
 };
 
-// Define Hooks
-
 onMounted(async () => {
   try {
     layoutStore.loading = true;
     const original: ISettings = await api.get();
-    const newSettings: ISettings = { ...original, commands: {} };
-
-    const keys = Object.keys(original.commands) as Array<keyof SettingsCommand>;
-    for (const key of keys) {
-      newSettings.commands[key] = original.commands[key];
-      commandObject.value[key] = original.commands[key]!.join("\n");
-    }
-
-    originalSettings.value = original;
-    settings.value = newSettings;
-    shellValue.value = newSettings.shell.join(" ");
+    settings.value = { ...original };
+    shellValue.value = (original.shell || []).join(" ");
   } catch (err) {
-    if (err instanceof Error) {
-      error.value = err;
-    }
+    if (err instanceof Error) error.value = err;
   } finally {
     layoutStore.loading = false;
   }
 });
 
-// Clear the debounce timeout when the component is destroyed
 onBeforeUnmount(() => {
-  if (debounceTimeout.value) {
-    clearTimeout(debounceTimeout.value);
-  }
+  if (debounceTimeout.value) clearTimeout(debounceTimeout.value);
 });
 </script>

@@ -44,6 +44,7 @@ type FileInfo struct {
 	Mode       os.FileMode       `json:"mode"`
 	IsDir      bool              `json:"isDir"`
 	IsSymlink  bool              `json:"isSymlink"`
+	IsBluray   bool              `json:"isBluray,omitempty"`
 	Type       string            `json:"type"`
 	Subtitles  []string          `json:"subtitles,omitempty"`
 	Content    string            `json:"content,omitempty"`
@@ -454,8 +455,10 @@ func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRe
 
 		if file.IsDir {
 			listing.NumDirs++
+			file.IsBluray = isBlurayPath(i.Fs, file.Path, file.Name, true)
 		} else {
 			listing.NumFiles++
+			file.IsBluray = strings.EqualFold(file.Extension, ".iso")
 
 			if isInvalidLink {
 				file.Type = "invalid_link"
@@ -470,8 +473,41 @@ func (i *FileInfo) readListing(checker rules.Checker, readHeader bool, calcImgRe
 		listing.Items = append(listing.Items, file)
 	}
 
+	i.IsBluray = isBlurayPath(i.Fs, i.Path, i.Name, true)
 	i.Listing = listing
 	return nil
+}
+
+func isBlurayPath(fsys afero.Fs, dirPath, name string, isDir bool) bool {
+	if !isDir {
+		return strings.EqualFold(filepath.Ext(name), ".iso")
+	}
+	if _, err := fsys.Stat(path.Join(dirPath, "BDMV", "index.bdmv")); err == nil {
+		return true
+	}
+	if strings.EqualFold(name, "BDMV") {
+		if _, err := fsys.Stat(path.Join(dirPath, "index.bdmv")); err == nil {
+			return true
+		}
+	}
+	// Check one level of subdirectories for disc wrapper folders (e.g. ReleaseName/DISC1/BDMV/index.bdmv)
+	f, err := fsys.Open(dirPath)
+	if err != nil {
+		return false
+	}
+	entries, err := f.Readdir(16)
+	_ = f.Close()
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			if _, err := fsys.Stat(path.Join(dirPath, e.Name(), "BDMV", "index.bdmv")); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func readDir(afs afero.Fs, dirname string) ([]os.FileInfo, error) {

@@ -1,6 +1,7 @@
 <template>
   <div
-    class="item"
+    class="item fb-list-item"
+    :class="{ 'is-hidden': name.startsWith('.') }"
     role="button"
     tabindex="0"
     :draggable="isDraggable"
@@ -22,59 +23,31 @@
     :data-ext="getExtension(name).toLowerCase()"
     @contextmenu="contextMenu"
   >
-    <div>
-      <img
-        v-if="!readOnly && type === 'image' && isThumbsEnabled"
-        v-lazy="thumbnailUrl"
-        :alt="name"
-      />
-      <i v-else class="material-icons"></i>
+    <div class="fb-col-name">
+      <div class="fb-item-icon">
+        <img
+          v-if="!readOnly && type === 'image' && isThumbsEnabled"
+          v-lazy="thumbnailUrl"
+          :alt="name"
+        />
+        <i v-else class="material-icons"></i>
+      </div>
+      <p class="name" :title="name">{{ name }}</p>
     </div>
 
-    <div>
-      <p class="name">{{ name }}</p>
+    <div class="fb-col-type">
+      <span class="fb-type-badge" :class="badgeClass">{{ typeBadge }}</span>
+    </div>
 
+    <div class="fb-col-size">
       <p v-if="isDir" class="size" data-order="-1">&mdash;</p>
       <p v-else class="size" :data-order="humanSize()">{{ humanSize() }}</p>
+    </div>
 
+    <div class="fb-col-modified">
       <p class="modified">
         <time :datetime="modified">{{ humanTime() }}</time>
       </p>
-
-      <div
-        v-if="!readOnly"
-        class="fb-row-quick-actions"
-        @click.stop
-        @dblclick.stop
-      >
-        <button
-          v-if="!isDir"
-          type="button"
-          class="fb-quick-btn"
-          title="MediaInfo"
-          @click.stop="openMediaInfo"
-        >
-          <i class="material-icons">analytics</i>
-        </button>
-        <button
-          v-if="isDir || name.toLowerCase().endsWith('.iso')"
-          type="button"
-          class="fb-quick-btn"
-          title="BDInfo 扫描"
-          @click.stop="openBDInfo"
-        >
-          <i class="material-icons">album</i>
-        </button>
-        <button
-          v-if="authStore.user?.perm.download"
-          type="button"
-          class="fb-quick-btn"
-          title="高速下载"
-          @click.stop="openFastDownload"
-        >
-          <i class="material-icons">bolt</i>
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -106,6 +79,7 @@ const router = useRouter();
 const props = defineProps<{
   name: string;
   isDir: boolean;
+  isBluray?: boolean;
   url: string;
   type: string;
   size: number;
@@ -154,30 +128,45 @@ const isThumbsEnabled = computed(() => {
   return enableThumbs;
 });
 
-const openMediaInfo = () => {
-  layoutStore.showHover({
-    prompt: "mediainfo",
-    props: { url: props.url, name: props.name },
-  });
-};
+const extUpper = computed(() => {
+  if (props.isDir) return "";
+  const raw = getExtension(props.name).replace(/^\./, "").toUpperCase();
+  return raw.slice(0, 6);
+});
 
-const openBDInfo = () => {
-  layoutStore.showHover({
-    prompt: "bdinfo",
-    props: { url: props.url, name: props.name },
-  });
-};
+const typeBadge = computed(() => {
+  if (props.isDir) {
+    return props.isBluray || props.name.toUpperCase() === "BDMV"
+      ? "BDMV"
+      : "目录";
+  }
+  return extUpper.value || "文件";
+});
 
-const openFastDownload = () => {
-  layoutStore.showHover({
-    prompt: "download",
-    props: { urls: [props.url] },
-    confirm: (format: any) => {
-      layoutStore.closeHovers();
-      api.download(format, props.url);
-    },
-  });
-};
+const badgeClass = computed(() => {
+  if (props.isDir) {
+    return props.isBluray || props.name.toUpperCase() === "BDMV"
+      ? "fb-badge--disc"
+      : "fb-badge--dir";
+  }
+  const e = extUpper.value;
+  if (["MKV", "MP4", "M2TS", "TS", "MOV", "AVI", "WEBM", "M4V"].includes(e)) {
+    return "fb-badge--video";
+  }
+  if (["ISO", "BDMV", "MPLS"].includes(e)) {
+    return "fb-badge--disc";
+  }
+  if (["ASS", "SSA", "SRT", "SUP", "VTT"].includes(e)) {
+    return "fb-badge--sub";
+  }
+  if (["FLAC", "WAV", "AAC", "MP3", "MKA", "DTS", "THD", "AC3"].includes(e)) {
+    return "fb-badge--audio";
+  }
+  if (["ZIP", "TAR", "GZ", "7Z", "RAR", "ZST", "XZ"].includes(e)) {
+    return "fb-badge--archive";
+  }
+  return "fb-badge--default";
+});
 
 const humanSize = () => {
   return props.type == "invalid_link" ? "invalid link" : filesize(props.size);

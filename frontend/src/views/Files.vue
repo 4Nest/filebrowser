@@ -1,23 +1,10 @@
 <template>
-  <div>
-    <header-bar
-      v-if="error || fileStore.req?.type === undefined"
-      showMenu
-      showLogo
-    />
-
-    <breadcrumbs base="/files" />
+  <div class="fb-files-container">
     <errors v-if="error" :errorCode="error.status" />
     <component v-else-if="currentView" :is="currentView"></component>
-    <div v-else>
-      <h2 class="message delayed">
-        <div class="spinner">
-          <div class="bounce1"></div>
-          <div class="bounce2"></div>
-          <div class="bounce3"></div>
-        </div>
-        <span>{{ t("files.loading") }}</span>
-      </h2>
+    <div v-else class="fb-loading-state">
+      <div class="fb-spinner"></div>
+      <span>{{ t("files.loading") }}</span>
     </div>
   </div>
 </template>
@@ -37,8 +24,6 @@ import { storeToRefs } from "pinia";
 import { useFileStore } from "@/stores/file";
 import { useLayoutStore } from "@/stores/layout";
 
-import HeaderBar from "@/components/header/HeaderBar.vue";
-import Breadcrumbs from "@/components/Breadcrumbs.vue";
 import Errors from "@/views/Errors.vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -70,7 +55,6 @@ const currentView = computed(() => {
   if (fileStore.req.isDir) {
     return FileListing;
   } else if (fileStore.req.extension.toLowerCase() === ".csv") {
-    // CSV files use Preview for table view, unless ?edit=true
     if (route.query.edit === "true") {
       return Editor;
     }
@@ -85,7 +69,6 @@ const currentView = computed(() => {
   }
 });
 
-// Define hooks
 onMounted(() => {
   fetchData();
   fileStore.isFiles = true;
@@ -102,79 +85,67 @@ onUnmounted(() => {
     layoutStore.toggleShell();
   }
   fileStore.updateRequest(null);
-  fetchDataController.abort();
 });
 
-watch(route, () => {
-  fetchData();
+watch(route, (to, from) => {
+  if (from.path.endsWith("/")) {
+    if (to.path.endsWith("/")) {
+      window.sessionStorage.setItem("listFrozen", "false");
+    } else {
+      window.sessionStorage.setItem("listFrozen", "true");
+    }
+    fetchData();
+  } else if (to.path.endsWith("/")) {
+    fileStore.$reset();
+    fetchData();
+  } else {
+    fetchData();
+  }
 });
 watch(reload, (newValue) => {
   newValue && fetchData();
 });
 
-// Define functions
-
-const applyPreSelection = () => {
-  const preselect = fileStore.preselect;
-  fileStore.preselect = null;
-
-  if (!fileStore.req?.isDir || fileStore.oldReq === null) return;
-
-  let index = -1;
-  if (preselect) {
-    // Find item with the specified path
-    index = fileStore.req.items.findIndex((item) => item.path === preselect);
-  } else if (fileStore.oldReq.path.startsWith(fileStore.req.path)) {
-    // Get immediate child folder of the previous path
-    const name = fileStore.oldReq.path
-      .substring(fileStore.req.path.length)
-      .split("/")
-      .shift();
-
-    index = fileStore.req.items.findIndex(
-      (val) => val.path == fileStore.req!.path + name
-    );
-  }
-
-  if (index === -1) return;
-  fileStore.selected.push(index);
-};
-
 const fetchData = async () => {
-  // Reset view information.
-  fileStore.reload = false;
   fileStore.selected = [];
   fileStore.multiple = false;
   layoutStore.closeHovers();
 
-  // Set loading to true and reset the error.
-  layoutStore.loading = true;
-  error.value = null;
+  if (
+    window.sessionStorage.getItem("listFrozen") !== "true" &&
+    !layoutStore.loading
+  ) {
+    layoutStore.loading = true;
+  }
 
   let url = route.path;
   if (url === "") url = "/";
   if (url[0] !== "/") url = "/" + url;
-  // Cancel the ongoing request
-  fetchDataController.abort();
-  fetchDataController = new AbortController();
-  try {
-    const res = await api.fetch(url, fetchDataController.signal);
-    fileStore.updateRequest(res);
-    document.title = `${res.name || t("sidebar.myFiles")} - ${t("files.files")} - ${name}`;
-    layoutStore.loading = false;
 
-    // Selects the post-reload target item or the previously visited child folder
-    applyPreSelection();
-  } catch (err) {
-    if (err instanceof StatusError && err.is_canceled) {
+  try {
+    fetchDataController.abort();
+    fetchDataController = new AbortController();
+    const res = await api.fetch(url, fetchDataController.signal);
+
+    let title = res.name;
+    if (title == "") {
+      title = t("files.home");
+    }
+    document.title = `${title} - ${t("files.files")} - ${name}`;
+
+    fileStore.updateRequest(res);
+    error.value = null;
+  } catch (e: any) {
+    if (e instanceof StatusError && e.is_canceled) {
       return;
     }
-    if (err instanceof Error) {
-      error.value = err;
-    }
+    error.value = e;
+  } finally {
     layoutStore.loading = false;
+    fileStore.reload = false;
   }
 };
+
 const keyEvent = (event: KeyboardEvent) => {
   if (event.key === "F1") {
     event.preventDefault();

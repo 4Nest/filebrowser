@@ -1,14 +1,16 @@
 <template>
-  <div>
+  <div class="fb-app-shell">
     <div v-if="uploadStore.totalBytes" class="progress">
       <div
-        v-bind:style="{
+        :style="{
           width: sentPercent + '%',
         }"
       ></div>
     </div>
+
     <sidebar></sidebar>
-    <main>
+
+    <main class="fb-app-main">
       <router-view></router-view>
       <shell
         v-if="
@@ -16,6 +18,7 @@
         "
       />
     </main>
+
     <prompts></prompts>
     <upload-files></upload-files>
   </div>
