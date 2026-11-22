@@ -49,6 +49,23 @@
           </div>
         </div>
 
+        <div class="fb-setting-row">
+          <div class="fb-setting-info">
+            <span class="fb-setting-title">文件页默认打开路径</span>
+            <span class="fb-setting-desc"
+              >登录或点击「我的文件」时自动进入的目录（留空则打开根目录）</span
+            >
+          </div>
+          <div class="fb-setting-control fb-setting-control--wide">
+            <input
+              class="input fb-mono"
+              type="text"
+              v-model="localPrefs.defaultPath"
+              placeholder="/torrents/qbittorrent"
+            />
+          </div>
+        </div>
+
         <label class="fb-setting-row fb-setting-row--click">
           <div class="fb-setting-info">
             <span class="fb-setting-title">隐藏点文件（`.` 开头）</span>
@@ -519,6 +536,7 @@ const updateSettings = async (event: Event) => {
       "singleClick",
       "dateFormat",
     ]);
+    saveLocalPrefs({ defaultPath: localPrefs.defaultPath.trim() });
     authStore.updateUser(data);
     $showSuccess(t("settings.settingsUpdated"));
   } catch (err) {

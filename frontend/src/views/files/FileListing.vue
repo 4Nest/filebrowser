@@ -291,6 +291,7 @@
         </h2>
         <div
           v-if="fileStore.req?.numDirs ?? false"
+          class="fb-items-group"
           data-clear-on-click="true"
           @contextmenu="showContextMenu"
         >
@@ -315,6 +316,7 @@
         </h2>
         <div
           v-if="fileStore.req?.numFiles ?? false"
+          class="fb-items-group"
           data-clear-on-click="true"
           @contextmenu="showContextMenu"
         >
@@ -1273,8 +1275,8 @@ const showContextMenu = (event: MouseEvent) => {
   event.preventDefault();
   isContextMenuVisible.value = true;
   contextMenuPos.value = {
-    x: event.clientX + 8,
-    y: event.clientY + Math.floor(window.scrollY),
+    x: event.clientX + 4,
+    y: event.clientY + 4,
   };
 };
 

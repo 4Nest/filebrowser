@@ -2,7 +2,7 @@
   <div class="breadcrumbs">
     <component
       :is="element"
-      :to="base || ''"
+      :to="base ? `${base}/?root=1` : ''"
       :aria-label="t('files.home')"
       :title="t('files.home')"
     >

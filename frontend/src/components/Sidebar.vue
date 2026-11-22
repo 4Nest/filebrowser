@@ -22,25 +22,6 @@
     </div>
 
     <template v-if="isLoggedIn">
-      <div class="fb-sidebar-quick" v-if="user.perm.create">
-        <button
-          type="button"
-          class="fb-create-btn fb-create-btn--primary"
-          @click="showHover('newDir')"
-        >
-          <i class="material-icons">create_new_folder</i>
-          <span>新建文件夹</span>
-        </button>
-        <button
-          type="button"
-          class="fb-create-btn"
-          @click="showHover('newFile')"
-          title="新建文件"
-        >
-          <i class="material-icons">note_add</i>
-        </button>
-      </div>
-
       <div class="fb-sidebar-scroll">
         <div class="fb-nav-group">
           <div class="fb-nav-label">工作区</div>
@@ -184,6 +165,7 @@ import {
   loginPage,
 } from "@/utils/constants";
 import { getTheme, getMediaPreference, setTheme } from "@/utils/theme";
+import { resolveDefaultFilesRoute } from "@/utils/prefs";
 import { files as api } from "@/api";
 import prettyBytes from "pretty-bytes";
 
@@ -250,7 +232,7 @@ export default {
       return Object.assign(this.usage, usageStats);
     },
     toRoot() {
-      this.$router.push({ path: "/files" });
+      this.$router.push({ path: resolveDefaultFilesRoute() });
       this.closeHovers();
     },
     go(path) {

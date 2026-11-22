@@ -18,6 +18,7 @@ export interface ImageHostPreset {
 }
 
 export interface LocalPrefs {
+  defaultPath: string;
   fastdlTtlHours: number;
   aria2Threads: number;
   bdinfoDefaultTab: "quick" | "bbcode" | "full";
@@ -93,6 +94,7 @@ export const DEFAULT_IMAGE_HOSTS: ImageHostPreset[] = [
 ];
 
 const DEFAULTS: LocalPrefs = {
+  defaultPath: "",
   fastdlTtlHours: 6,
   aria2Threads: 16,
   bdinfoDefaultTab: "quick",
@@ -125,6 +127,10 @@ export function getLocalPrefs(): LocalPrefs {
         : DEFAULT_IMAGE_HOSTS.map((h) => ({ ...h }));
 
     return {
+      defaultPath:
+        typeof parsed.defaultPath === "string"
+          ? parsed.defaultPath.trim()
+          : DEFAULTS.defaultPath,
       fastdlTtlHours: [2, 6, 24, 48].includes(parsed.fastdlTtlHours)
         ? parsed.fastdlTtlHours
         : DEFAULTS.fastdlTtlHours,
@@ -191,4 +197,16 @@ export function saveLocalPrefs(prefs: Partial<LocalPrefs>): LocalPrefs {
     // ignore storage quota errors
   }
   return next;
+}
+
+export function resolveDefaultFilesRoute(): string {
+  const raw = getLocalPrefs().defaultPath.trim();
+  if (!raw || raw === "/") return "/files/";
+  const cleaned = raw.replace(/^\/+|\/+$/g, "");
+  const encoded = cleaned
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+  return encoded ? `/files/${encoded}/` : "/files/";
 }

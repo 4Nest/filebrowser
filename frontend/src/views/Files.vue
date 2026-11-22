@@ -26,10 +26,11 @@ import { useLayoutStore } from "@/stores/layout";
 
 import Errors from "@/views/Errors.vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import FileListing from "@/views/files/FileListing.vue";
 import { StatusError } from "@/api/utils";
 import { name } from "../utils/constants";
+import { resolveDefaultFilesRoute } from "@/utils/prefs";
 
 const Editor = defineAsyncComponent(() => import("@/views/files/Editor.vue"));
 const Preview = defineAsyncComponent(() => import("@/views/files/Preview.vue"));
@@ -40,6 +41,7 @@ const fileStore = useFileStore();
 const { reload } = storeToRefs(fileStore);
 
 const route = useRoute();
+const router = useRouter();
 
 const { t } = useI18n({});
 
@@ -70,6 +72,16 @@ const currentView = computed(() => {
 });
 
 onMounted(() => {
+  if (
+    (route.path === "/files" || route.path === "/files/") &&
+    route.query.root !== "1"
+  ) {
+    const def = resolveDefaultFilesRoute();
+    if (def !== "/files/") {
+      router.replace({ path: def });
+      return;
+    }
+  }
   fetchData();
   fileStore.isFiles = true;
   window.addEventListener("keydown", keyEvent);
