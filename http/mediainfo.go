@@ -368,19 +368,30 @@ func detectBDMVRoot(fullPath string) (string, error) {
 }
 
 func extractBDInfoQuickSummary(fullReport string) string {
-	idx := strings.Index(fullReport, "QUICK SUMMARY:")
+	norm := strings.ReplaceAll(fullReport, "\r\n", "\n")
+	norm = strings.ReplaceAll(norm, "\r", "\n")
+
+	idx := strings.Index(norm, "QUICK SUMMARY:")
 	if idx >= 0 {
-		rest := fullReport[idx:]
-		for _, stop := range []string{"\nFILES:", "\nCHAPTERS:", "\nSTREAM DIAGNOSTICS:", "\n\n\n"} {
-			if sIdx := strings.Index(rest, stop); sIdx > 0 {
-				rest = rest[:sIdx]
-				break
+		rest := norm[idx:]
+		// Cut at the next major section or end of BBCode block, never on blank lines.
+		cutAt := len(rest)
+		for _, stop := range []string{
+			"\n[/code]",
+			"\nFILES:",
+			"\nCHAPTERS:",
+			"\nSTREAM DIAGNOSTICS:",
+			"\n<--- END FORUMS PASTE --->",
+			"\n********************",
+		} {
+			if sIdx := strings.Index(rest, stop); sIdx > 0 && sIdx < cutAt {
+				cutAt = sIdx
 			}
 		}
-		return strings.TrimSpace(rest)
+		return strings.TrimSpace(rest[:cutAt])
 	}
-	// Fallback: cut before FILES: / STREAM DIAGNOSTICS:
-	out := fullReport
+
+	out := norm
 	for _, stop := range []string{"\nFILES:", "\nSTREAM DIAGNOSTICS:"} {
 		if sIdx := strings.Index(out, stop); sIdx > 0 {
 			out = out[:sIdx]

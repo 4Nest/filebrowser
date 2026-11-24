@@ -1637,8 +1637,8 @@ input[type="checkbox"]:checked::after {
 }
 
 .card.floating {
-  max-width: 32rem !important;
-  width: min(32rem, 94vw) !important;
+  max-width: 32rem;
+  width: min(32rem, 94vw);
 }
 
 .card .card-action {
@@ -1892,8 +1892,10 @@ select.input {
 }
 
 /* MediaInfo / BDInfo / FastDL Modals */
-.fb-media-modal,
-.fb-fastdl-modal {
+.card.floating.fb-media-modal,
+.card.floating.fb-fastdl-modal,
+.card.floating.fb-shot-modal,
+.card.floating.fb-info-modal {
   width: min(64rem, 94vw) !important;
   max-width: 94vw !important;
   max-height: 88vh !important;
@@ -1901,8 +1903,16 @@ select.input {
   flex-direction: column !important;
 }
 
-.fb-fastdl-modal {
+.card.floating.fb-shot-modal {
+  width: min(68rem, 95vw) !important;
+}
+
+.card.floating.fb-fastdl-modal {
   width: min(54rem, 94vw) !important;
+}
+
+.card.floating.fb-info-modal {
+  width: min(46rem, 94vw) !important;
 }
 
 .fb-media-header {

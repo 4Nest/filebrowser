@@ -380,8 +380,7 @@ const canBDInfo = computed(() => {
 const canScreenshot = computed(
   () =>
     selectedCount.value <= 1 &&
-    ((!isDir.value && VIDEO_EXTS.has(fileExt.value)) ||
-      (isDir.value && canBDInfo.value))
+    ((!isDir.value && VIDEO_EXTS.has(fileExt.value)) || canBDInfo.value)
 );
 
 const calcDirSize = async () => {

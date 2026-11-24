@@ -267,6 +267,7 @@ func fastDLServeHandler(w http.ResponseWriter, r *http.Request, d *data) (int, e
 		if err != nil {
 			return errToStatus(err), err
 		}
+		w.Header().Set("ETag", fmt.Sprintf(`"%x-%x"`, file.Size, file.ModTime.UnixNano()))
 		return rawFileHandler(w, r, file)
 
 	case "vtar":

@@ -172,21 +172,82 @@ func probeVideo(ctx context.Context, ffprobeBin, filePath string) (*ffprobeResul
 	return res, nil
 }
 
-// If user selects a BDMV directory, auto-pick the largest .m2ts stream file.
-func resolveScreenshotTarget(fullPath string) (string, error) {
+// resolveScreenshotTarget resolves a video file, BDMV directory, or .iso disc image
+// into a concrete video stream file path plus an optional cleanup callback (used to
+// unmount temporary read-only ISO loop mounts).
+func resolveScreenshotTarget(fullPath string) (string, func(), error) {
+	noop := func() {}
 	st, err := os.Stat(fullPath)
 	if err != nil {
-		return "", err
-	}
-	if !st.IsDir() {
-		return fullPath, nil
+		return "", noop, err
 	}
 
-	streamDirs := []string{
-		filepath.Join(fullPath, "BDMV", "STREAM"),
-		filepath.Join(fullPath, "STREAM"),
-		fullPath,
+	if !st.IsDir() {
+		if strings.EqualFold(filepath.Ext(fullPath), ".iso") {
+			mntDir, err := os.MkdirTemp("", "fb-iso-mnt-*")
+			if err != nil {
+				return "", noop, err
+			}
+			helper := strings.TrimSpace(os.Getenv("FB_ISO_MOUNT_HELPER"))
+			if helper == "" {
+				helper = "/usr/local/bin/iso-mount-helper"
+			}
+			var cmd *exec.Cmd
+			if _, statErr := os.Stat(helper); statErr == nil {
+				cmd = exec.Command("sudo", "-n", helper, "mount", fullPath, mntDir)
+			} else {
+				cmd = exec.Command("mount", "-o", "loop,ro", fullPath, mntDir)
+			}
+			var errBuf bytes.Buffer
+			cmd.Stderr = &errBuf
+			if err := cmd.Run(); err != nil {
+				_ = os.RemoveAll(mntDir)
+				return "", noop, fmt.Errorf("挂载 ISO 失败: %s", strings.TrimSpace(errBuf.String()))
+			}
+			cleanup := func() {
+				if _, statErr := os.Stat(helper); statErr == nil {
+					_ = exec.Command("sudo", "-n", helper, "umount", mntDir).Run()
+				} else {
+					_ = exec.Command("umount", mntDir).Run()
+				}
+				_ = os.RemoveAll(mntDir)
+			}
+			streamFile, err := findLargestStreamInDir(mntDir)
+			if err != nil {
+				cleanup()
+				return "", noop, err
+			}
+			return streamFile, cleanup, nil
+		}
+		return fullPath, noop, nil
 	}
+
+	streamFile, err := findLargestStreamInDir(fullPath)
+	if err != nil {
+		return "", noop, err
+	}
+	return streamFile, noop, nil
+}
+
+func findLargestStreamInDir(rootDir string) (string, error) {
+	streamDirs := []string{
+		filepath.Join(rootDir, "BDMV", "STREAM"),
+		filepath.Join(rootDir, "STREAM"),
+		filepath.Join(rootDir, "VIDEO_TS"),
+		rootDir,
+	}
+	// Also check one level of subdirectory (e.g. ReleaseFolder/DISC1/BDMV/STREAM)
+	if subEntries, err := os.ReadDir(rootDir); err == nil {
+		for _, se := range subEntries {
+			if se.IsDir() {
+				candidate := filepath.Join(rootDir, se.Name(), "BDMV", "STREAM")
+				if st, err := os.Stat(candidate); err == nil && st.IsDir() {
+					streamDirs = append([]string{candidate}, streamDirs...)
+				}
+			}
+		}
+	}
+
 	var bestPath string
 	var bestSize int64
 	for _, dir := range streamDirs {
@@ -199,7 +260,7 @@ func resolveScreenshotTarget(fullPath string) (string, error) {
 				continue
 			}
 			ext := strings.ToLower(filepath.Ext(e.Name()))
-			if ext == ".m2ts" || ext == ".mkv" || ext == ".mp4" || ext == ".ts" {
+			if ext == ".m2ts" || ext == ".mkv" || ext == ".mp4" || ext == ".ts" || ext == ".vob" {
 				if info, err := e.Info(); err == nil && info.Size() > bestSize {
 					bestSize = info.Size()
 					bestPath = filepath.Join(dir, e.Name())
@@ -210,7 +271,7 @@ func resolveScreenshotTarget(fullPath string) (string, error) {
 			return bestPath, nil
 		}
 	}
-	return "", errors.New("未在所选目录中找到可截图的视频文件或 BDMV/STREAM/*.m2ts")
+	return "", errors.New("未在所选目录或 ISO 中找到可截图的视频流 (BDMV/STREAM/*.m2ts 或 VIDEO_TS/*.VOB)")
 }
 
 func formatTimestamp(sec float64) string {
@@ -244,10 +305,11 @@ var screenshotCaptureHandler = withUser(func(w http.ResponseWriter, r *http.Requ
 		return http.StatusServiceUnavailable, err
 	}
 
-	targetPath, err := resolveScreenshotTarget(d.user.FullPath(reqPath))
+	targetPath, cleanupTarget, err := resolveScreenshotTarget(d.user.FullPath(reqPath))
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
+	defer cleanupTarget()
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()

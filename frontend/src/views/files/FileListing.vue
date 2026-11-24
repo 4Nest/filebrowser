@@ -637,7 +637,7 @@ const headerButtons = computed(() => {
   const isScreenshotTarget =
     isVideoFile ||
     (fileStore.selectedCount === 0 && currentDirIsBluray.value) ||
-    (isSelectedBluray && single?.isDir);
+    isSelectedBluray;
 
   return {
     upload: authStore.user?.perm.create,
