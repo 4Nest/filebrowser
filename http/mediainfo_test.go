@@ -21,4 +21,10 @@ func TestExtractBDInfoQuickSummaryCRLF(t *testing.T) {
 	require.Contains(t, got, "Disc Size: 24,358,546,475 bytes")
 	require.Contains(t, got, "Video: MPEG-4 AVC Video")
 	require.NotContains(t, got, "FILES:")
+	require.NotContains(t, got, "\r")
+	require.NotContains(t, got, "\n\n\n")
+
+	full := normalizeBDInfoText(sample)
+	require.NotContains(t, full, "\r")
+	require.NotContains(t, full, "\n\n\n")
 }

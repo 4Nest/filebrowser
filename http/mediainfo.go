@@ -367,9 +367,22 @@ func detectBDMVRoot(fullPath string) (string, error) {
 	return "", errors.New("当前目录及其子目录中未检测到 BDMV/index.bdmv 原盘结构")
 }
 
-func extractBDInfoQuickSummary(fullReport string) string {
-	norm := strings.ReplaceAll(fullReport, "\r\n", "\n")
+var multiBlankLineRegex = regexp.MustCompile(`\n{3,}`)
+
+func normalizeBDInfoText(raw string) string {
+	norm := strings.ReplaceAll(raw, "\r\n", "\n")
 	norm = strings.ReplaceAll(norm, "\r", "\n")
+	lines := strings.Split(norm, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " \t")
+	}
+	cleaned := strings.Join(lines, "\n")
+	cleaned = multiBlankLineRegex.ReplaceAllString(cleaned, "\n\n")
+	return strings.TrimSpace(cleaned)
+}
+
+func extractBDInfoQuickSummary(fullReport string) string {
+	norm := normalizeBDInfoText(fullReport)
 
 	idx := strings.Index(norm, "QUICK SUMMARY:")
 	if idx >= 0 {
@@ -388,7 +401,7 @@ func extractBDInfoQuickSummary(fullReport string) string {
 				cutAt = sIdx
 			}
 		}
-		return strings.TrimSpace(rest[:cutAt])
+		return normalizeBDInfoText(rest[:cutAt])
 	}
 
 	out := norm
@@ -398,7 +411,7 @@ func extractBDInfoQuickSummary(fullReport string) string {
 			break
 		}
 	}
-	return strings.TrimSpace(out)
+	return normalizeBDInfoText(out)
 }
 
 func parseBDInfoSummary(report string) bdInfoSummary {
@@ -569,8 +582,9 @@ func (m *bdInfoManager) runTask(ctx context.Context, taskID, bin, targetPath str
 		return
 	}
 
-	quick := extractBDInfoQuickSummary(reportText)
-	summary := parseBDInfoSummary(reportText)
+	normalizedReport := normalizeBDInfoText(reportText)
+	quick := extractBDInfoQuickSummary(normalizedReport)
+	summary := parseBDInfoSummary(normalizedReport)
 
 	m.mu.Lock()
 	if t, ok := m.tasks[taskID]; ok {
@@ -578,7 +592,7 @@ func (m *bdInfoManager) runTask(ctx context.Context, taskID, bin, targetPath str
 		t.Progress = 100
 		t.Stage = "扫描完成"
 		t.Summary = summary
-		t.FullReport = strings.TrimSpace(reportText)
+		t.FullReport = normalizedReport
 		t.QuickSummary = quick
 		t.FinishedAt = time.Now()
 		t.ElapsedSec = t.FinishedAt.Sub(t.StartedAt).Seconds()
